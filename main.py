@@ -35,7 +35,7 @@ class Index:
         # TODO draw progress bar
 
         for f in files:
-            text = open('./data/subset/' + f, "r")
+            text = open(folder_name + f, "r")
             for line in text:
                 # TODO save (reference?) to original document
                 # Remove tags
@@ -43,7 +43,7 @@ class Index:
                 # Lowercase as early as possible, reduces amount of calls
                 line = line.lower()
                 # Remove punctuation from words
-                words = re.split('[\. ()\[\]",:;]', line)
+                words = re.split('[\. ()\[\]",:-;]', line)
                 for w in words:
                     # Set up dictionary
                     if w not in self.tf_per_doc:
@@ -81,7 +81,9 @@ class Index:
 
     def printIndexStats(self):
         print("Words in index")
-        print(len(words))
+        print(self.posting_list)
+        print('====')
+        print(self.docs_indexed)
         # TODO MOOOORE
 
 def main():
