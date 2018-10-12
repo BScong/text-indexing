@@ -45,7 +45,7 @@ class Index:
 
         offset = 0
         for filename in files:
-            file = open('./data/subset/' + filename, "r")
+            file = open(folder_name + filename, "r")
             text = ""
             for line in file:
                 text += line
@@ -104,7 +104,9 @@ class Index:
 
     def printIndexStats(self):
         print("Words in index")
-        print(len(words))
+        print(self.posting_list)
+        print('====')
+        print(self.docs_indexed)
         # TODO MOOOORE
 
 def main():
