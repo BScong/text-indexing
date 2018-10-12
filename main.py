@@ -109,6 +109,13 @@ class Index:
         print(self.docs_indexed)
         # TODO MOOOORE
 
+    def search(self, aWord):
+        if aWord in self.posting_list:
+            for document in self.posting_list[aWord].keys():
+                print('Document: ', document , '---' , 'Frequency: ', self.posting_list[aWord][document])
+        else:
+            print("Word not found")
+
 def main():
     print("\nWelcome to the research engine")
     print("==============================")
@@ -148,7 +155,8 @@ def main():
                 folder = default
             index.indexFolder(folder)
         elif menu_item == 2:
-            # TODO
+            aWord = input('Please enter your word: ')
+            index.search(aWord)
             pass
         elif menu_item == 3:
             index.printIndexStats()
