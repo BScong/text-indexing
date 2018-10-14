@@ -3,6 +3,7 @@ from os.path import isfile, join
 from collections import OrderedDict
 import sys
 import io
+import os
 import struct
 import math
 import re
@@ -28,9 +29,9 @@ class Index:
 
         return 1 + math.log10(count_doc_occurrences)
 
-    def read_pl_for_word(self, pl_len, pl_offset, pl_row_len=8):
+    def read_pl_for_word(self, pl_len, pl_offset, path, pl_row_len=8):
         pl = OrderedDict()
-        with open(self.path, 'rb') as pl_file:
+        with open(path, 'rb') as pl_file:
             pl_file.seek(pl_offset)
             while pl_file.tell() < pl_offset + pl_len:
                 byte_row = pl_file.read(pl_row_len)
@@ -38,32 +39,38 @@ class Index:
                 pl.update({pl_struct[0]: pl_struct[1]})
         return pl
 
-    def read_nth_entry_from_pl(self, n, pl_offset, pl_row_len=8):
-        with open(self.path, 'rb') as pl_file:
+    def read_nth_entry_from_pl(self, n, pl_offset, path, pl_row_len=8):
+        with open(path, 'rb') as pl_file:
             pl_file.seek(pl_offset + (n * pl_row_len))
             byte_row = pl_file.read(pl_row_len)
             item = struct.unpack('!If', byte_row)
         return item
 
-    def write_pl_row(self, document, score):
+    def write_pl_row(self, document, score, path):
         binary_pack = struct.pack('!If', document, score)
         self.__binary_pl.write(binary_pack)
         # write PL in memory to disk if it exceeds one MB in size
         if self.__binary_pl.tell() > 1024000:
-            self.save_pl_to_disk()
+            self.save_pl_to_disk(path)
 
         return len(binary_pack)
 
-    def save_pl_to_disk(self):
+    def save_pl_to_disk(self, path):
         # Open file and read buffer into it
         self.__binary_pl.seek(0)
-        with open(self.path, 'wb') as out:
+        with open(path, 'wb') as out:
             out.write(self.__binary_pl.read())
         self.__binary_pl.close()
         self.__binary_pl = io.BytesIO(b"")
 
-    def finalize_pl(self):
-        self.save_pl_to_disk()
+    def finalize_pl(self, path):
+        self.save_pl_to_disk(path)
+
+    def finalize_merge_pl(self, temp, path):
+        self.save_pl_to_disk(temp)
+        if os.path.exists(path):
+            os.remove(path)
+        os.rename(temp, path)
 
     def inverse_document_freq(self, num_where_appeared):
         # see slide 10
@@ -78,102 +85,128 @@ class Index:
             return ""
         return "".join(found.itertext())
 
-    def index_folder(self, folder_name):
+    def index_folder(self, folder_name, batch_size = 10):
         # Open files from specified folder
-        files = [f for f in listdir(folder_name) if isfile(join(folder_name, f))]
+        files = [folder_name+f for f in listdir(folder_name) if isfile(join(folder_name, f))]
         # Increase number of indexed documents by the amount of docs found
         self.docs_indexed = self.docs_indexed + len(files)
         print("Adding {} files to index".format(len(files)))
+        for i in range(0, len(files), batch_size):
+            pl = self.process_files(files[i:min(i+10,len(files))])
+            self.merge_save(pl)
 
-        terminal.print_progress(0,
-                                len(files),
-                                prefix='Step 1 of 2: ',
-                                suffix='Complete',
-                                bar_length=80)
 
-        files_indexed = 0
+    def merge_save(self, tf_per_doc):
+        temp_path = './pl_temp'
+        pl_offset = 0
+        for w in self.voc:
+            pl = self.read_pl_for_word(*(self.voc[w]), self.path)
 
-        # Dictionary of term frequencies per word per doc
-        tf_per_doc = {}
-        for filename in files:
-            with open(folder_name + filename, "r") as file:
-                text = ""
-                for line in file:
-                    text += line
-                text = "<DOCCOLLECTION>" + text + "</DOCCOLLECTION>"
+            if w in tf_per_doc:
+                for document in pl:
+                    pl[document] = pl[document]/self.count[w][1] if self.count[w][1]!=0 else pl[document]
+                for document, term_frequency in tf_per_doc[w].items():
+                    pl[document] = term_frequency
+                self.count[w]=(self.count[w][0]+len(tf_per_doc[w]), self.inverse_document_freq(self.count[w][0]+len(tf_per_doc[w])))
 
-                docs = ElTree.fromstring(text)
+            pl_len = 0
+            for document, term_frequency in pl.items():
+                if self.count[w][1] < 0:
+                    continue
+                pl_len += self.write_pl_row(document, term_frequency * self.count[w][1], temp_path)
+            self.voc[w] = (pl_len, pl_offset)
+            pl_offset += pl_len
 
-                articles_indexed = 0
-                for article in docs:
-                    doc_id = int(article.find('./DOCID').text.strip()) + (files_indexed * (10 ** 6))
-                    terminal.print_progress(files_indexed + (articles_indexed / len(docs)),
-                                            len(files),
-                                            prefix='Step 1 of 2: ',
-                                            suffix='Complete, (doc {} from file {})'.format(doc_id, filename),
-                                            bar_length=80)
+        # iterate in tf_per_doc for words not in voc
+        for w in tf_per_doc:
+            if w not in self.voc:
+                self.count[w]=(len(tf_per_doc[w]), self.inverse_document_freq(len(tf_per_doc[w])))
+                if self.count[w][1] < 0:
+                    continue
+                pl_len = 0
+                for document, term_frequency in tf_per_doc[w].items():
+                    pl_len += self.write_pl_row(document, term_frequency * self.count[w][1], temp_path)
+                self.voc[w] = (pl_len, pl_offset)
+                pl_offset += pl_len
 
-                    # print("Adding document {} from file {} to index".format(doc_id, filename))
-                    important_stuff = Index.get_element_inner_text(article, './HEADLINE') + '\n' \
-                        + Index.get_element_inner_text(article, './BYLINE') + '\n' \
-                        + Index.get_element_inner_text(article, './TEXT') + '\n' \
-                        + Index.get_element_inner_text(article, './SUBJECT') + '\n' \
-                        + Index.get_element_inner_text(article, './GRAPHIC') + '\n'
+        self.finalize_merge_pl(temp_path, self.path)
+        return
 
-                    # TODO save (reference?) to original document
-                    # Lowercase as early as possible, reduces amount of calls
-                    important_stuff = important_stuff.lower()
-                    # Remove punctuation from words
-                    words = re.split('[. ()\[\]\-",:;\n!?]', important_stuff)
-                    for w in words:
-                        # Set up dictionary
-                        if w not in tf_per_doc:
-                            tf_per_doc[w] = {}
-                        if doc_id not in tf_per_doc[w]:
-                            tf_per_doc[w][doc_id] = 0
-                        tf_per_doc[w][doc_id] += 1
-                    # Calculate tf for each entry
-                    for w in words:
-                        tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id])
-                    articles_indexed += 1
+    @staticmethod
+    def extract_data(raw_document_path, files_indexed):
+        texts = {}
+        with open(raw_document_path, "r") as file:
+            text = ""
+            for line in file:
+                text += line
+            text = "<DOCCOLLECTION>" + text + "</DOCCOLLECTION>"
 
-                files_indexed += 1
-        # Temporary dictionary with the idfs to prepare for the posting list creation
-        inverted_document_freqs = {}
+            docs = ElTree.fromstring(text)
 
-        terminal.print_progress(0,
-                                len(tf_per_doc),
-                                prefix='Step 2 of 2: ',
-                                suffix='Complete',
-                                bar_length=80)
+            articles_indexed = 0
+            for article in docs:
+                doc_id = int(article.find('./DOCID').text.strip()) + (files_indexed * (10 ** 6))
 
-        words_treated = 0
+                # print("Adding document {} from file {} to index".format(doc_id, filename))
+                important_stuff = Index.get_element_inner_text(article, './HEADLINE') + '\n' \
+                    + Index.get_element_inner_text(article, './BYLINE') + '\n' \
+                    + Index.get_element_inner_text(article, './TEXT') + '\n' \
+                    + Index.get_element_inner_text(article, './SUBJECT') + '\n' \
+                    + Index.get_element_inner_text(article, './GRAPHIC') + '\n'
+
+                # TODO save (reference?) to original document
+                # Lowercase as early as possible, reduces amount of calls
+                important_stuff = important_stuff.lower()
+                texts[doc_id]=important_stuff
+                articles_indexed += 1
+        return texts
+
+    def save_pl(self, tf_per_doc):
         pl_offset = 0
         # Iterate words from tf dictionary
         for word, documents in tf_per_doc.items():
             # Calculate idf values
-            inverted_document_freqs[word] = self.inverse_document_freq(len(documents))
+            if word not in self.count:
+                self.count[word]=(len(documents),inverted_document_freqs[word])
+            else:
+                self.count[word]=(self.count[word][0]+len(documents), self.inverse_document_freq(self.count[word][0]+len(documents)))
             # Filter for stop words
-            if inverted_document_freqs[word] < 0:
+            if self.count[word][1] < 0:
                 continue
 
-            docs_treated = 0
             pl_len = 0
             # Calculate score for each element of the posting list
             for document, term_frequency in documents.items():
-                terminal.print_progress(words_treated + (docs_treated / len(documents)),
-                                        len(tf_per_doc),
-                                        prefix='Step 2 of 2: ',
-                                        suffix='Complete (Writing PL for {})'.format(word),
-                                        bar_length=80)
-                pl_len += self.write_pl_row(document, term_frequency * inverted_document_freqs[word])
-                docs_treated += 1
+                pl_len += self.write_pl_row(document, term_frequency * self.count[word][1], self.path)
             self.voc[word] = (pl_len, pl_offset)
             pl_offset += pl_len
-            words_treated += 1
 
-        self.finalize_pl()
+        self.finalize_pl(self.path)
+        return
+
+    def process_files(self, files):
+        files_indexed = 0
+        # Dictionary of term frequencies per word per doc
+        tf_per_doc = {}
+        for filename in files:
+            for doc_id, text in Index.extract_data(filename, files_indexed).items():
+                # Remove punctuation from words
+                words = re.split('[. ()\[\]\-",:;\n!?]', text)
+                for w in words:
+                    # Set up dictionary
+                    if w not in tf_per_doc:
+                        tf_per_doc[w] = {}
+                    if doc_id not in tf_per_doc[w]:
+                        tf_per_doc[w][doc_id] = 0
+                    tf_per_doc[w][doc_id] += 1
+                # Calculate tf for each entry
+                for w in words:
+                    tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id])
+
+            files_indexed += 1
         print("\nSuccess")
+        return tf_per_doc
+
 
     def print_index_stats(self):
         print("Words in index")
@@ -189,7 +222,7 @@ class Searcher:
 
     def search(self, a_word):
         if a_word in self.index.voc:
-            pl = self.index.read_pl_for_word(*(self.index.voc[a_word]))
+            pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
             for document, score in pl.items():
                 print('Document: ', document, '---', 'Frequency: ', score)
         else:
