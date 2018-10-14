@@ -58,7 +58,7 @@ class Index:
     def save_pl_to_disk(self, path):
         # Open file and read buffer into it
         self.__binary_pl.seek(0)
-        with open(path, 'wb') as out:
+        with open(path, 'ab') as out:
             out.write(self.__binary_pl.read())
         self.__binary_pl.close()
         self.__binary_pl = io.BytesIO(b"")
@@ -87,13 +87,37 @@ class Index:
 
     def index_folder(self, folder_name, batch_size = 10):
         # Open files from specified folder
-        files = [folder_name+f for f in listdir(folder_name) if isfile(join(folder_name, f))]
-        # Increase number of indexed documents by the amount of docs found
-        self.docs_indexed = self.docs_indexed + len(files)
-        print("Adding {} files to index".format(len(files)))
-        for i in range(0, len(files), batch_size):
-            pl = self.process_files(files[i:min(i+10,len(files))])
-            self.merge_save(pl)
+        try:
+            # check if folder_name is folder
+            if folder_name[-1]!='/':
+                folder_name = folder_name + '/'
+
+            files = [folder_name+f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
+
+
+            print("Adding {} files to index".format(len(files)))
+            terminal.print_progress(0,
+                                    len(files),
+                                    prefix='Adding files: ',
+                                    suffix='Complete',
+                                    bar_length=80)
+            for i in range(0, len(files), batch_size):
+                pl = self.process_files(files[i:min(i+batch_size,len(files))])
+                terminal.print_progress(min(i+batch_size/2,len(files)),
+                                        len(files),
+                                        prefix='Adding files: ',
+                                        suffix='Complete',
+                                        bar_length=80)
+                # Increase number of indexed documents by the amount of docs processed
+                self.docs_indexed += min(i+batch_size,len(files))-i
+                self.merge_save(pl)
+                terminal.print_progress(min(i+batch_size,len(files)),
+                                        len(files),
+                                        prefix='Adding files: ',
+                                        suffix='Complete',
+                                        bar_length=80)
+        except Exception as e:
+            print("Error: " + str(e))
 
 
     def merge_save(self, tf_per_doc):
@@ -204,7 +228,6 @@ class Index:
                     tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id])
 
             files_indexed += 1
-        print("\nSuccess")
         return tf_per_doc
 
 
