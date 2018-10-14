@@ -17,6 +17,7 @@ class Index:
         # In-memory representation of the posting list
         self.__binary_pl = io.BytesIO(b"")
         self.voc = {}
+        self.count = {}
         self.path = path
 
     @staticmethod
@@ -95,48 +96,48 @@ class Index:
         # Dictionary of term frequencies per word per doc
         tf_per_doc = {}
         for filename in files:
-            file = open(folder_name + filename, "r")
-            text = ""
-            for line in file:
-                text += line
-            text = "<DOCCOLLECTION>" + text + "</DOCCOLLECTION>"
+            with open(folder_name + filename, "r") as file:
+                text = ""
+                for line in file:
+                    text += line
+                text = "<DOCCOLLECTION>" + text + "</DOCCOLLECTION>"
 
-            docs = ElTree.fromstring(text)
+                docs = ElTree.fromstring(text)
 
-            articles_indexed = 0
-            for article in docs:
-                doc_id = int(article.find('./DOCID').text.strip()) + (files_indexed * (10 ** 6))
-                terminal.print_progress(files_indexed + (articles_indexed / len(docs)),
-                                        len(files),
-                                        prefix='Step 1 of 2: ',
-                                        suffix='Complete, (doc {} from file {})'.format(doc_id, filename),
-                                        bar_length=80)
+                articles_indexed = 0
+                for article in docs:
+                    doc_id = int(article.find('./DOCID').text.strip()) + (files_indexed * (10 ** 6))
+                    terminal.print_progress(files_indexed + (articles_indexed / len(docs)),
+                                            len(files),
+                                            prefix='Step 1 of 2: ',
+                                            suffix='Complete, (doc {} from file {})'.format(doc_id, filename),
+                                            bar_length=80)
 
-                # print("Adding document {} from file {} to index".format(doc_id, filename))
-                important_stuff = Index.get_element_inner_text(article, './HEADLINE') + '\n' \
-                    + Index.get_element_inner_text(article, './BYLINE') + '\n' \
-                    + Index.get_element_inner_text(article, './TEXT') + '\n' \
-                    + Index.get_element_inner_text(article, './SUBJECT') + '\n' \
-                    + Index.get_element_inner_text(article, './GRAPHIC') + '\n'
+                    # print("Adding document {} from file {} to index".format(doc_id, filename))
+                    important_stuff = Index.get_element_inner_text(article, './HEADLINE') + '\n' \
+                        + Index.get_element_inner_text(article, './BYLINE') + '\n' \
+                        + Index.get_element_inner_text(article, './TEXT') + '\n' \
+                        + Index.get_element_inner_text(article, './SUBJECT') + '\n' \
+                        + Index.get_element_inner_text(article, './GRAPHIC') + '\n'
 
-                # TODO save (reference?) to original document
-                # Lowercase as early as possible, reduces amount of calls
-                important_stuff = important_stuff.lower()
-                # Remove punctuation from words
-                words = re.split('[. ()\[\]\-",:;\n!?]', important_stuff)
-                for w in words:
-                    # Set up dictionary
-                    if w not in tf_per_doc:
-                        tf_per_doc[w] = {}
-                    if doc_id not in tf_per_doc[w]:
-                        tf_per_doc[w][doc_id] = 0
-                    tf_per_doc[w][doc_id] += 1
-                # Calculate tf for each entry
-                for w in words:
-                    tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id])
-                articles_indexed += 1
+                    # TODO save (reference?) to original document
+                    # Lowercase as early as possible, reduces amount of calls
+                    important_stuff = important_stuff.lower()
+                    # Remove punctuation from words
+                    words = re.split('[. ()\[\]\-",:;\n!?]', important_stuff)
+                    for w in words:
+                        # Set up dictionary
+                        if w not in tf_per_doc:
+                            tf_per_doc[w] = {}
+                        if doc_id not in tf_per_doc[w]:
+                            tf_per_doc[w][doc_id] = 0
+                        tf_per_doc[w][doc_id] += 1
+                    # Calculate tf for each entry
+                    for w in words:
+                        tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id])
+                    articles_indexed += 1
 
-            files_indexed += 1
+                files_indexed += 1
         # Temporary dictionary with the idfs to prepare for the posting list creation
         inverted_document_freqs = {}
 
