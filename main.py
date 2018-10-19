@@ -1,6 +1,7 @@
 from os import listdir
 from os.path import isfile, join
 from collections import OrderedDict
+from functools import reduce
 import sys
 import io
 import os
@@ -10,9 +11,39 @@ import re
 import xml.etree.ElementTree as ElTree
 import terminal
 
+# pip install stemming
+from stemming.porter2 import stem
+
+class ILinePreparation:
+    def prepare_line(self, line):
+        raise NotImplementedError("All inheriting line preparators should implement this method")
+
+
+class IWordPreparation:
+    def prepare_word(self, text):
+        raise NotImplementedError("All inheriting word preparators should implement this method")
+
+
+class LowercasePreparation(ILinePreparation):
+    def prepare_line(self, line):
+        return line.lower()
+
+
+class DeleteCharacterPreparation(ILinePreparation):
+    def __init__(self):
+        self.filter_characters = '[. ()\[\]\-",:;\n!?]'
+
+    def prepare_line(self, line):
+        return re.sub(self.filter_characters, ' ', line)
+
+
+class StemmingPreparation(IWordPreparation):
+    def prepare_word(self, word):
+        return stem(word)
+
 
 class Index:
-    def __init__(self, path):
+    def __init__(self, path, line_preparation, word_preparation):
 
         self.docs_indexed = 0
         # In-memory representation of the posting list
@@ -20,6 +51,8 @@ class Index:
         self.voc = {}
         self.count = {}
         self.path = path
+        self.line_filters = line_preparation
+        self.word_filters = word_preparation
 
     @staticmethod
     def term_frequency(count_doc_occurrences):
@@ -29,7 +62,8 @@ class Index:
 
         return 1 + math.log10(count_doc_occurrences)
 
-    def read_pl_for_word(self, pl_len, pl_offset, path, pl_row_len=8):
+    @staticmethod
+    def read_pl_for_word(pl_len, pl_offset, path, pl_row_len=8):
         pl = OrderedDict()
         with open(path, 'rb') as pl_file:
             pl_file.seek(pl_offset)
@@ -39,7 +73,8 @@ class Index:
                 pl.update({pl_struct[0]: pl_struct[1]})
         return pl
 
-    def read_nth_entry_from_pl(self, n, pl_offset, path, pl_row_len=8):
+    @staticmethod
+    def read_nth_entry_from_pl(n, pl_offset, path, pl_row_len=8):
         with open(path, 'rb') as pl_file:
             pl_file.seek(pl_offset + (n * pl_row_len))
             byte_row = pl_file.read(pl_row_len)
@@ -85,15 +120,14 @@ class Index:
             return ""
         return "".join(found.itertext())
 
-    def index_folder(self, folder_name, batch_size = 10):
+    def index_folder(self, folder_name, batch_size=10):
         # Open files from specified folder
         try:
             # check if folder_name is folder
-            if folder_name[-1]!='/':
+            if folder_name[-1] != '/':
                 folder_name = folder_name + '/'
 
-            files = [folder_name+f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
-
+            files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
 
             print("Adding {} files to index".format(len(files)))
             terminal.print_progress(0,
@@ -102,36 +136,39 @@ class Index:
                                     suffix='Complete',
                                     bar_length=80)
             for i in range(0, len(files), batch_size):
-                pl = self.process_files(files[i:min(i+batch_size,len(files))])
-                terminal.print_progress(min(i+batch_size/2,len(files)),
+                pl = self.process_files(files[i:min(i + batch_size, len(files))])
+                terminal.print_progress(min(i + batch_size / 2, len(files)),
                                         len(files),
                                         prefix='Adding files: ',
                                         suffix='Complete',
                                         bar_length=80)
                 # Increase number of indexed documents by the amount of docs processed
-                self.docs_indexed += min(i+batch_size,len(files))-i
+                self.docs_indexed += min(i + batch_size, len(files)) - i
                 self.merge_save(pl)
-                terminal.print_progress(min(i+batch_size,len(files)),
+                terminal.print_progress(min(i + batch_size, len(files)),
                                         len(files),
                                         prefix='Adding files: ',
                                         suffix='Complete',
                                         bar_length=80)
         except Exception as e:
-            print("Error: " + str(e))
-
+            # print("Error: " + str(e))
+            raise e
 
     def merge_save(self, tf_per_doc):
         temp_path = './pl_temp'
         pl_offset = 0
         for w in self.voc:
-            pl = self.read_pl_for_word(*(self.voc[w]), self.path)
+            pl = Index.read_pl_for_word(*(self.voc[w]), self.path)
 
             if w in tf_per_doc:
                 for document in pl:
-                    pl[document] = pl[document]/self.count[w][1] if self.count[w][1]!=0 else pl[document]
+                    pl[document] = pl[document] / self.count[w][1] if self.count[w][1] != 0 else pl[document]
                 for document, term_frequency in tf_per_doc[w].items():
                     pl[document] = term_frequency
-                self.count[w]=(self.count[w][0]+len(tf_per_doc[w]), self.inverse_document_freq(self.count[w][0]+len(tf_per_doc[w])))
+                self.count[w] = (
+                    self.count[w][0] + len(tf_per_doc[w]),
+                    self.inverse_document_freq(self.count[w][0] + len(tf_per_doc[w]))
+                )
 
             pl_len = 0
             for document, term_frequency in pl.items():
@@ -144,7 +181,7 @@ class Index:
         # iterate in tf_per_doc for words not in voc
         for w in tf_per_doc:
             if w not in self.voc:
-                self.count[w]=(len(tf_per_doc[w]), self.inverse_document_freq(len(tf_per_doc[w])))
+                self.count[w] = (len(tf_per_doc[w]), self.inverse_document_freq(len(tf_per_doc[w])))
                 if self.count[w][1] < 0:
                     continue
                 pl_len = 0
@@ -181,7 +218,7 @@ class Index:
                 # TODO save (reference?) to original document
                 # Lowercase as early as possible, reduces amount of calls
                 important_stuff = important_stuff.lower()
-                texts[doc_id]=important_stuff
+                texts[doc_id] = important_stuff
                 articles_indexed += 1
         return texts
 
@@ -191,9 +228,13 @@ class Index:
         for word, documents in tf_per_doc.items():
             # Calculate idf values
             if word not in self.count:
-                self.count[word]=(len(documents),inverted_document_freqs[word])
+                self.count[word] = (len(documents), inverted_document_freqs[word])
             else:
-                self.count[word]=(self.count[word][0]+len(documents), self.inverse_document_freq(self.count[word][0]+len(documents)))
+                self.count[word] = (
+                    self.count[word][0] + len(documents),
+                    self.inverse_document_freq(self.count[word][0] + len(documents))
+                )
+
             # Filter for stop words
             if self.count[word][1] < 0:
                 continue
@@ -208,6 +249,13 @@ class Index:
         self.finalize_pl(self.path)
         return
 
+    def apply_word_filters(self, value):
+        for f in self.word_filters:
+            value = f.prepare_word(value)
+
+        return value
+
+
     def process_files(self, files):
         files_indexed = 0
         # Dictionary of term frequencies per word per doc
@@ -215,7 +263,12 @@ class Index:
         for filename in files:
             for doc_id, text in Index.extract_data(filename, files_indexed).items():
                 # Remove punctuation from words
-                words = re.split('[. ()\[\]\-",:;\n!?]', text)
+                for filter in self.line_filters:
+                    text = filter.prepare_line(text)
+                words = text.split(" ")
+                words = [self.apply_word_filters(x) for x in words]
+                words = [x for x in words if not x == ""]
+
                 for w in words:
                     # Set up dictionary
                     if w not in tf_per_doc:
@@ -230,7 +283,6 @@ class Index:
             files_indexed += 1
         return tf_per_doc
 
-
     def print_index_stats(self):
         print("Words in index")
         print(len(self.voc))
@@ -240,12 +292,28 @@ class Index:
 
 
 class Searcher:
-    def __init__(self, index):
+    def __init__(self, index, word_filters, line_filters):
         self.index = index
+        self.word_filters = word_filters
+        self.line_filters = line_filters
+
+    def prepare_query(self, query):
+        for filter in self.line_filters:
+            query = filter.prepare_line(query)
+
+        seperated_words = query.split(" ")
+
+        for i in range(len(seperated_words)):
+            for filter in self.word_filters:
+                seperated_words[i] = filter.prepare_word(seperated_words[i])
+
+        return seperated_words.join(" ")
+
 
     def search(self, a_word):
+        a_word = self.prepare_query(a_word)
         if a_word in self.index.voc:
-            pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
+            pl = Index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
             for document, score in pl.items():
                 print('Document: ', document, '---', 'Frequency: ', score)
         else:
@@ -267,7 +335,7 @@ def main():
         path = m.group(0)
 
     # Get a instance of our index and search
-    index = Index(path)
+    index = Index(path, [LowercasePreparation(), DeleteCharacterPreparation()], [StemmingPreparation()])
     searcher = Searcher(index)
     # Prepare the RegEx to find numbers in our user input
     int_find = re.compile('\d+')
