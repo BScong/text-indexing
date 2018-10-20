@@ -292,7 +292,7 @@ class Index:
 
 
 class Searcher:
-    def __init__(self, index, word_filters, line_filters):
+    def __init__(self, index, line_filters, word_filters):
         self.index = index
         self.word_filters = word_filters
         self.line_filters = line_filters
@@ -307,7 +307,7 @@ class Searcher:
             for filter in self.word_filters:
                 seperated_words[i] = filter.prepare_word(seperated_words[i])
 
-        return seperated_words.join(" ")
+        return " ".join(seperated_words)
 
 
     def search(self, a_word):
@@ -334,9 +334,11 @@ def main():
     if m is not None:
         path = m.group(0)
 
+    line_filters = [LowercasePreparation(), DeleteCharacterPreparation()]
+    word_filters = [StemmingPreparation()]
     # Get a instance of our index and search
-    index = Index(path, [LowercasePreparation(), DeleteCharacterPreparation()], [StemmingPreparation()])
-    searcher = Searcher(index)
+    index = Index(path, line_filters, word_filters)
+    searcher = Searcher(index, line_filters, word_filters)
     # Prepare the RegEx to find numbers in our user input
     int_find = re.compile('\d+')
 
@@ -370,9 +372,11 @@ def main():
                 folder = default
             index.index_folder(folder)
         elif menu_item == 2:
-            a_word = input('Please enter your word: ')
-            searcher.search(a_word)
-            pass
+            while True:
+                a_word = input('Please enter your word or type :quit to return to menu: ')
+                if a_word == ":quit":
+                    break
+                searcher.search(a_word)
         elif menu_item == 3:
             index.print_index_stats()
         elif menu_item == 4:
