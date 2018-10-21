@@ -22,12 +22,12 @@ class Index:
         self.path = path
 
     @staticmethod
-    def term_frequency(count_doc_occurrences):
+    def term_frequency(count_doc_occurrences, max_freq):
         # see slide 8
         if count_doc_occurrences == 0:
             return 0
 
-        return 1 + math.log10(count_doc_occurrences)
+        return (0.5+ 0.5*count_doc_occurrences/max_freq)
 
     def read_pl_for_word(self, pl_len, pl_offset, path, pl_row_len=8):
         pl = OrderedDict()
@@ -95,27 +95,11 @@ class Index:
             files = [folder_name+f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
 
 
-            print("Adding {} files to index".format(len(files)))
-            terminal.print_progress(0,
-                                    len(files),
-                                    prefix='Adding files: ',
-                                    suffix='Complete',
-                                    bar_length=80)
             for i in range(0, len(files), batch_size):
                 pl = self.process_files(files[i:min(i+batch_size,len(files))])
-                terminal.print_progress(min(i+batch_size/2,len(files)),
-                                        len(files),
-                                        prefix='Adding files: ',
-                                        suffix='Complete',
-                                        bar_length=80)
                 # Increase number of indexed documents by the amount of docs processed
                 self.docs_indexed += min(i+batch_size,len(files))-i
                 self.merge_save(pl)
-                terminal.print_progress(min(i+batch_size,len(files)),
-                                        len(files),
-                                        prefix='Adding files: ',
-                                        suffix='Complete',
-                                        bar_length=80)
         except Exception as e:
             print("Error: " + str(e))
 
@@ -216,6 +200,8 @@ class Index:
             for doc_id, text in Index.extract_data(filename, files_indexed).items():
                 # Remove punctuation from words
                 words = re.split('[. ()\[\]\-",:;\n!?]', text)
+                #The maximum frequency of a word in the doc
+                max_freq = 1
                 for w in words:
                     # Set up dictionary
                     if w not in tf_per_doc:
@@ -223,9 +209,11 @@ class Index:
                     if doc_id not in tf_per_doc[w]:
                         tf_per_doc[w][doc_id] = 0
                     tf_per_doc[w][doc_id] += 1
+                    if tf_per_doc[w][doc_id] > max_freq:
+                        maxFreq = tf_per_doc[w][doc_id]
                 # Calculate tf for each entry
                 for w in words:
-                    tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id])
+                    tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id], max_freq)
 
             files_indexed += 1
         return tf_per_doc
@@ -243,13 +231,20 @@ class Searcher:
     def __init__(self, index):
         self.index = index
 
-    def search(self, a_word):
-        if a_word in self.index.voc:
-            pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
-            for document, score in pl.items():
-                print('Document: ', document, '---', 'Frequency: ', score)
-        else:
-            print("Word not found")
+    def search(self, word_list):
+        pl = {}
+        for a_word in word_list:
+            if a_word in self.index.voc:
+                found_pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path) 				
+                for document, score in found_pl.items():
+                    if document not in pl:
+                        pl[document] = 0    
+                    pl[document] += score                    
+            else:
+                print(a_word+" : Word not found")
+        pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
+        for document, score in pl:
+            print('Document: ', document, '---', 'Frequency: ', score)		
 
 
 def main():
@@ -302,8 +297,8 @@ def main():
                 folder = default
             index.index_folder(folder)
         elif menu_item == 2:
-            a_word = input('Please enter your word: ')
-            searcher.search(a_word)
+            search_query = input('Please enter your search: ')
+            searcher.search(search_query.split())
             pass
         elif menu_item == 3:
             index.print_index_stats()
