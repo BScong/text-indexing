@@ -232,9 +232,22 @@ class Searcher:
         self.index = index
 
     def search(self, word_list):
-        pl = {}
+		pl = {}
         for a_word in word_list:
-            if a_word in self.index.voc:
+            if a_word.find('&') > -1:
+                conjonctive_part = a_word.split('&')
+                #initialise the pl with the first word 				
+                conj_pl = self.index.read_pl_for_word(*(self.index.voc[conjonctive_part[0]]), self.index.path)				
+				for conj_word in conjonctive_part:
+				#make the intersection of the documents found for all words of the conjonctive query
+					found_pl = self.index.read_pl_for_word(*(self.index.voc[conj_word]), self.index.path)
+					intersect = {}
+					for item in conj_pl.keys(  ):
+						if found_pl.has_key(item):     
+                            intersect.update({item : found_pl[item] + conj_pl[item])
+                        conj_pl = intersect
+                pl.update(conj_pl)								
+            else if a_word in self.index.voc:
                 found_pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path) 				
                 for document, score in found_pl.items():
                     if document not in pl:
