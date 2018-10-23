@@ -232,22 +232,37 @@ class Searcher:
         self.index = index
 
     def search(self, word_list):
-		pl = {}
+        pl = {}
         for a_word in word_list:
             if a_word.find('&') > -1:
                 conjonctive_part = a_word.split('&')
-                #initialise the pl with the first word 				
-                conj_pl = self.index.read_pl_for_word(*(self.index.voc[conjonctive_part[0]]), self.index.path)				
-				for conj_word in conjonctive_part:
-				#make the intersection of the documents found for all words of the conjonctive query
-					found_pl = self.index.read_pl_for_word(*(self.index.voc[conj_word]), self.index.path)
-					intersect = {}
-					for item in conj_pl.keys(  ):
-						if found_pl.has_key(item):     
-                            intersect.update({item : found_pl[item] + conj_pl[item])
-                        conj_pl = intersect
-                pl.update(conj_pl)								
-            else if a_word in self.index.voc:
+                #initialise the pl with the first word
+                if conjonctive_part[0] in self.index.voc: 				
+                    conj_pl = self.index.read_pl_for_word(*(self.index.voc[conjonctive_part[0]]), self.index.path)
+                else:
+                        print(conjonctive_part[0]+" : Word not found")
+                        break					
+                for conj_word in conjonctive_part:
+                    if conj_word in self.index.voc:
+				    #make the intersection of the documents found for all words of the conjonctive query
+                        found_pl = self.index.read_pl_for_word(*(self.index.voc[conj_word]), self.index.path)
+                        intersect = {}
+                        """for item in conj_pl.keys(  ):
+                            if found_pl.has_key(item):     
+                                intersect.update({item : found_pl[item] + conj_pl[item]})
+                            conj_pl = intersect"""
+                        keys_a = set(conj_pl.keys())
+                        keys_b = set(found_pl.keys())
+                        intersect_keys = keys_a & keys_b
+                        for item in intersect_keys: 					
+                            intersect.update({item : found_pl[item] + conj_pl[item]})
+                        conj_pl = intersect							
+                    else:
+                        print(conj_word+" : Word not found")
+                        pl={}						
+                        break
+                pl.update(conj_pl)						
+            elif a_word in self.index.voc:
                 found_pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path) 				
                 for document, score in found_pl.items():
                     if document not in pl:
@@ -255,6 +270,8 @@ class Searcher:
                     pl[document] += score                    
             else:
                 print(a_word+" : Word not found")
+        if not bool(pl):
+            print("No document found")		
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
         for document, score in pl:
             print('Document: ', document, '---', 'Frequency: ', score)		
