@@ -244,7 +244,7 @@ class Searcher:
                         break					
                 for conj_word in conjonctive_part:
                     if conj_word in self.index.voc:
-				    #make the intersection of the documents found for all words of the conjonctive query
+                        # make the intersection of the documents found for all words of the conjonctive query
                         found_pl = self.index.read_pl_for_word(*(self.index.voc[conj_word]), self.index.path)
                         intersect = {}
                         """for item in conj_pl.keys(  ):
@@ -259,7 +259,7 @@ class Searcher:
                         conj_pl = intersect							
                     else:
                         print(conj_word+" : Word not found")
-                        pl={}						
+                        conj_pl.clear()
                         break
                 pl.update(conj_pl)						
             elif a_word in self.index.voc:
