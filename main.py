@@ -1,7 +1,6 @@
 from os import listdir
 from os.path import isfile, join
 from collections import OrderedDict
-from functools import reduce
 import sys
 import io
 import os
@@ -31,7 +30,7 @@ class LowercasePreparation(ILinePreparation):
 
 class DeleteCharacterPreparation(ILinePreparation):
     def __init__(self):
-        self.filter_characters = '[. ()\[\]\-",:;\n!?]'
+        self.filter_characters = '[. ()\[\]\-",:;\n!?]|[0-9]+'
 
     def prepare_line(self, line):
         return re.sub(self.filter_characters, ' ', line)
@@ -131,16 +130,11 @@ class Index:
 
             for i in range(0, len(files), batch_size):
 
-                pl = self.process_files(files[i:min(i + batch_size, len(files))])
-                terminal.print_progress(min(i + batch_size / 2, len(files)),
-                                        len(files),
-                                        prefix='Adding files: ',
-                                        suffix='Complete',
-                                        bar_length=80)
+                tfs = self.process_files(files[i:min(i + batch_size, len(files))])
 
                 # Increase number of indexed documents by the amount of docs processed
                 self.docs_indexed += min(i + batch_size, len(files)) - i
-                self.merge_save(pl)
+                self.merge_save(tfs)
 
                 terminal.print_progress(min(i + batch_size, len(files)),
                                         len(files),
@@ -220,32 +214,6 @@ class Index:
                 articles_indexed += 1
         return texts
 
-    def save_pl(self, tf_per_doc):
-        pl_offset = 0
-        # Iterate words from tf dictionary
-        for word, documents in tf_per_doc.items():
-            # Calculate idf values
-            if word not in self.count:
-                self.count[word] = (len(documents), inverted_document_freqs[word])
-            else:
-                self.count[word] = (
-                    self.count[word][0] + len(documents),
-                    self.inverse_document_freq(self.count[word][0] + len(documents))
-                )
-
-            # Filter for stop words
-            if self.count[word][1] < 0:
-                continue
-
-            pl_len = 0
-            # Calculate score for each element of the posting list
-            for document, term_frequency in documents.items():
-                pl_len += self.write_pl_row(document, term_frequency * self.count[word][1], self.path)
-            self.voc[word] = (pl_len, pl_offset)
-            pl_offset += pl_len
-
-        self.finalize_pl(self.path)
-        return
 
     def apply_word_filters(self, value):
         for f in self.word_filters:
@@ -279,7 +247,7 @@ class Index:
                         tf_per_doc[w][doc_id] = 0
                     tf_per_doc[w][doc_id] += 1
                     if tf_per_doc[w][doc_id] > max_freq:
-                        maxFreq = tf_per_doc[w][doc_id]
+                        max_freq = tf_per_doc[w][doc_id]
                 # Calculate tf for each entry
                 for w in words:
                     tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id], max_freq)
@@ -412,7 +380,6 @@ def main():
                 folder = default
             index.index_folder(folder)
         elif menu_item == 2:
-
             while True:
                 search_query = input('Please enter your word or type :quit to return to menu: ')
                 if search_query == ":quit":
