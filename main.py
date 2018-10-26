@@ -153,10 +153,10 @@ class Index:
             pl = Index.read_pl_for_word(*(self.voc[w]), self.path)
 
             if w in tf_per_doc:
-                for document in pl:
-                    pl[document] = pl[document] / self.count[w][1] if self.count[w][1] != 0 else pl[document]
-                for document, term_frequency in tf_per_doc[w].items():
-                    pl[document] = term_frequency
+                for old_document in pl:
+                    pl[old_document] = pl[old_document] / self.count[w][1] if self.count[w][1] != 0 else pl[old_document]
+                for new_document, term_frequency in tf_per_doc[w].items():
+                    pl[new_document] = term_frequency
                 self.count[w] = (
                     self.count[w][0] + len(tf_per_doc[w]),
                     self.inverse_document_freq(self.count[w][0] + len(tf_per_doc[w]))
@@ -164,8 +164,6 @@ class Index:
 
             pl_len = 0
             for document, term_frequency in pl.items():
-                if self.count[w][1] < 0:
-                    continue
                 pl_len += self.write_pl_row(document, term_frequency * self.count[w][1], temp_path)
             self.voc[w] = (pl_len, pl_offset)
             pl_offset += pl_len
@@ -176,8 +174,8 @@ class Index:
                 #               count of docs the word shows up in, idf
                 self.count[w] = (len(tf_per_doc[w]), self.inverse_document_freq(len(tf_per_doc[w])))
                 pl_len = 0
-                for document, term_frequency in tf_per_doc[w].items():
-                    pl_len += self.write_pl_row(document, term_frequency * self.count[w][1], temp_path)
+                for new_document, term_frequency in tf_per_doc[w].items():
+                    pl_len += self.write_pl_row(new_document, term_frequency * self.count[w][1], temp_path)
                 self.voc[w] = (pl_len, pl_offset)
                 pl_offset += pl_len
 
