@@ -38,7 +38,9 @@ class DeleteCharacterPreparation(ILinePreparation):
 
 class StemmingPreparation(IWordPreparation):
     def prepare_word(self, word):
-        return stem(word)
+        # return stem(word)
+        return word
+        # faster
 
 
 class Index:
@@ -132,8 +134,6 @@ class Index:
 
                 tfs = self.process_files(files[i:min(i + batch_size, len(files))])
 
-                # Increase number of indexed documents by the amount of docs processed
-                self.docs_indexed += min(i + batch_size, len(files)) - i
                 self.merge_save(tfs)
 
                 terminal.print_progress(min(i + batch_size, len(files)),
@@ -173,9 +173,8 @@ class Index:
         # iterate in tf_per_doc for words not in voc
         for w in tf_per_doc:
             if w not in self.voc:
+                #               count of docs the word shows up in, idf
                 self.count[w] = (len(tf_per_doc[w]), self.inverse_document_freq(len(tf_per_doc[w])))
-                if self.count[w][1] < 0:
-                    continue
                 pl_len = 0
                 for document, term_frequency in tf_per_doc[w].items():
                     pl_len += self.write_pl_row(document, term_frequency * self.count[w][1], temp_path)
@@ -251,6 +250,8 @@ class Index:
                 # Calculate tf for each entry
                 for w in words:
                     tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id], max_freq)
+
+                self.docs_indexed += 1
 
             files_indexed += 1
         return tf_per_doc
