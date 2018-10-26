@@ -217,7 +217,7 @@ class Index:
 
                 # TODO save (reference?) to original document
                 # Lowercase as early as possible, reduces amount of calls
-                important_stuff = important_stuff.lower()
+                # important_stuff = important_stuff.lower()
                 texts[doc_id] = important_stuff
                 articles_indexed += 1
         return texts
