@@ -55,12 +55,12 @@ class Index:
         self.word_filters = word_preparation
 
     @staticmethod
-    def term_frequency(count_doc_occurrences):
+    def term_frequency(count_doc_occurrences, max_freq):
         # see slide 8
         if count_doc_occurrences == 0:
             return 0
 
-        return 1 + math.log10(count_doc_occurrences)
+        return (0.5+ 0.5*count_doc_occurrences/max_freq)
 
     @staticmethod
     def read_pl_for_word(pl_len, pl_offset, path, pl_row_len=8):
@@ -129,27 +129,25 @@ class Index:
 
             files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
 
-            print("Adding {} files to index".format(len(files)))
-            terminal.print_progress(0,
-                                    len(files),
-                                    prefix='Adding files: ',
-                                    suffix='Complete',
-                                    bar_length=80)
             for i in range(0, len(files), batch_size):
+
                 pl = self.process_files(files[i:min(i + batch_size, len(files))])
                 terminal.print_progress(min(i + batch_size / 2, len(files)),
                                         len(files),
                                         prefix='Adding files: ',
                                         suffix='Complete',
                                         bar_length=80)
+
                 # Increase number of indexed documents by the amount of docs processed
                 self.docs_indexed += min(i + batch_size, len(files)) - i
                 self.merge_save(pl)
+
                 terminal.print_progress(min(i + batch_size, len(files)),
                                         len(files),
                                         prefix='Adding files: ',
                                         suffix='Complete',
                                         bar_length=80)
+
         except Exception as e:
             # print("Error: " + str(e))
             raise e
@@ -263,6 +261,10 @@ class Index:
         for filename in files:
             for doc_id, text in Index.extract_data(filename, files_indexed).items():
                 # Remove punctuation from words
+
+                #The maximum frequency of a word in the doc
+                max_freq = 1
+
                 for filter in self.line_filters:
                     text = filter.prepare_line(text)
                 words = text.split(" ")
@@ -276,9 +278,11 @@ class Index:
                     if doc_id not in tf_per_doc[w]:
                         tf_per_doc[w][doc_id] = 0
                     tf_per_doc[w][doc_id] += 1
+                    if tf_per_doc[w][doc_id] > max_freq:
+                        maxFreq = tf_per_doc[w][doc_id]
                 # Calculate tf for each entry
                 for w in words:
-                    tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id])
+                    tf_per_doc[w][doc_id] = Index.term_frequency(tf_per_doc[w][doc_id], max_freq)
 
             files_indexed += 1
         return tf_per_doc
@@ -310,14 +314,50 @@ class Searcher:
         return " ".join(seperated_words)
 
 
-    def search(self, a_word):
-        a_word = self.prepare_query(a_word)
-        if a_word in self.index.voc:
-            pl = Index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
-            for document, score in pl.items():
-                print('Document: ', document, '---', 'Frequency: ', score)
-        else:
-            print("Word not found")
+    def search(self, word_list):
+        pl = {}
+        for a_word in word_list:
+            if a_word.find('&') > -1:
+                conjonctive_part = a_word.split('&')
+                #initialise the pl with the first word
+                if conjonctive_part[0] in self.index.voc: 				
+                    conj_pl = self.index.read_pl_for_word(*(self.index.voc[conjonctive_part[0]]), self.index.path)
+                else:
+                        print(conjonctive_part[0]+" : Word not found")
+                        break					
+                for conj_word in conjonctive_part:
+                    if conj_word in self.index.voc:
+                        # make the intersection of the documents found for all words of the conjonctive query
+                        found_pl = self.index.read_pl_for_word(*(self.index.voc[conj_word]), self.index.path)
+                        intersect = {}
+                        """for item in conj_pl.keys(  ):
+                            if found_pl.has_key(item):     
+                                intersect.update({item : found_pl[item] + conj_pl[item]})
+                            conj_pl = intersect"""
+                        keys_a = set(conj_pl.keys())
+                        keys_b = set(found_pl.keys())
+                        intersect_keys = keys_a & keys_b
+                        for item in intersect_keys: 					
+                            intersect.update({item : found_pl[item] + conj_pl[item]})
+                        conj_pl = intersect							
+                    else:
+                        print(conj_word+" : Word not found")
+                        conj_pl.clear()
+                        break
+                pl.update(conj_pl)						
+            elif a_word in self.index.voc:
+                found_pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path) 				
+                for document, score in found_pl.items():
+                    if document not in pl:
+                        pl[document] = 0    
+                    pl[document] += score                    
+            else:
+                print(a_word+" : Word not found")
+        if not bool(pl):
+            print("No document found")		
+        pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
+        for document, score in pl:
+            print('Document: ', document, '---', 'Frequency: ', score)		
 
 
 def main():
@@ -372,11 +412,13 @@ def main():
                 folder = default
             index.index_folder(folder)
         elif menu_item == 2:
+
             while True:
-                a_word = input('Please enter your word or type :quit to return to menu: ')
-                if a_word == ":quit":
+                search_query = input('Please enter your word or type :quit to return to menu: ')
+                if search_query == ":quit":
                     break
-                searcher.search(a_word)
+                searcher.search(search_query.split())
+
         elif menu_item == 3:
             index.print_index_stats()
         elif menu_item == 4:
