@@ -136,11 +136,11 @@ class Index:
 
                 self.merge_save(tfs)
 
-                terminal.print_progress(min(i + batch_size, len(files)),
+                """terminal.print_progress(min(i + batch_size, len(files)),
                                         len(files),
                                         prefix='Adding files: ',
                                         suffix='Complete',
-                                        bar_length=80)
+                                        bar_length=80)"""
 
         except Exception as e:
             # print("Error: " + str(e))
@@ -292,15 +292,11 @@ class Searcher:
                 else:
                         print(conjonctive_part[0]+" : Word not found")
                         break					
-                for conj_word in conjonctive_part:
-                    if conj_word in self.index.voc:
+                for i in range(1, len(conjonctive_part)):
+                    if conjonctive_part[i] in self.index.voc:
                         # make the intersection of the documents found for all words of the conjonctive query
-                        found_pl = self.index.read_pl_for_word(*(self.index.voc[conj_word]), self.index.path)
+                        found_pl = self.index.read_pl_for_word(*(self.index.voc[conjonctive_part[i]]), self.index.path)
                         intersect = {}
-                        """for item in conj_pl.keys(  ):
-                            if found_pl.has_key(item):     
-                                intersect.update({item : found_pl[item] + conj_pl[item]})
-                            conj_pl = intersect"""
                         keys_a = set(conj_pl.keys())
                         keys_b = set(found_pl.keys())
                         intersect_keys = keys_a & keys_b
@@ -308,7 +304,7 @@ class Searcher:
                             intersect.update({item : found_pl[item] + conj_pl[item]})
                         conj_pl = intersect							
                     else:
-                        print(conj_word+" : Word not found")
+                        print(conjonctive_part[i]+" : Word not found")
                         conj_pl.clear()
                         break
                 pl.update(conj_pl)						
@@ -324,7 +320,7 @@ class Searcher:
             print("No document found")		
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
         for document, score in pl:
-            print('Document: ', document, '---', 'Frequency: ', score)		
+            print('Document: ', document, '---', 'Score: ', score)
 
 
 def main():
