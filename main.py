@@ -136,11 +136,11 @@ class Index:
 
                 self.merge_save(tfs)
 
-                """terminal.print_progress(min(i + batch_size, len(files)),
+                terminal.print_progress(min(i + batch_size, len(files)),
                                         len(files),
                                         prefix='Adding files: ',
                                         suffix='Complete',
-                                        bar_length=80)"""
+                                        bar_length=80)
 
         except Exception as e:
             # print("Error: " + str(e))
