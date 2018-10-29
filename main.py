@@ -136,11 +136,11 @@ class Index:
 
                 self.merge_save(tfs)
 
-                terminal.print_progress(min(i + batch_size, len(files)),
+                """terminal.print_progress(min(i + batch_size, len(files)),
                                         len(files),
                                         prefix='Adding files: ',
                                         suffix='Complete',
-                                        bar_length=80)
+                                        bar_length=80)"""
 
         except Exception as e:
             # print("Error: " + str(e))
@@ -322,6 +322,28 @@ class Searcher:
         for document, score in pl:
             print('Document: ', document, '---', 'Score: ', score)
 
+    def knn(self, doc, k):
+        #take the words out of the document
+        doc_pl = {}
+        for word in self.index.voc:
+            found_pl = self.index.read_pl_for_word(*(self.index.voc[word]), self.index.path)
+            if doc in found_pl.keys():
+                doc_pl.update({word: found_pl[doc]})
+        pl = {}
+        for a_word in doc_pl.keys():
+            found_pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
+            for document, score in found_pl.items():
+                if document != doc:
+                    if document not in pl:
+                        pl[document] = 0
+                    pl[document] += score * doc_pl[a_word]
+        pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
+        count = 0
+        for document, score in pl:
+            print('Document: ', document, '---', 'Score: ', score)
+            count += 1
+            if count == k:
+                break
 
 def main():
     print("\nWelcome to the research engine")
@@ -351,7 +373,8 @@ def main():
         print("1) Add a folder of documents to the index")
         print("2) Do a search query")
         print("3) Show stats about the index")
-        print("4) Exit")
+        print("4) Look for similar documents")
+        print("5) Exit")
         print("\n Please enter the number of a menu item")
 
         user_choice = input('> ')
@@ -384,6 +407,13 @@ def main():
         elif menu_item == 3:
             index.print_index_stats()
         elif menu_item == 4:
+            while True:
+                search_query = input('Please enter your document or type :quit to return to menu: ')
+                if search_query == ":quit":
+                    break
+                k = input('Please enter the number of documents you want: ')
+                searcher.knn(int(search_query), int(k))
+        elif menu_item == 5:
             exit(0)
         else:
             print("Unknown menu item")
