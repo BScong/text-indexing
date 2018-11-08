@@ -54,6 +54,7 @@ class Index:
         self.path = path
         self.line_filters = line_preparation
         self.word_filters = word_preparation
+        self.documents_content = {}
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
@@ -222,11 +223,12 @@ class Index:
     def process_files(self, files):
         files_indexed = 0
         # Dictionary of term frequencies per word per doc
+
         tf_per_doc = {}
         for filename in files:
             for doc_id, text in Index.extract_data(filename, files_indexed).items():
                 # Remove punctuation from words
-
+                self.documents_content[doc_id] = text
                 #The maximum frequency of a word in the doc
                 max_freq = 1
 
@@ -374,7 +376,8 @@ def main():
         print("2) Do a search query")
         print("3) Show stats about the index")
         print("4) Look for similar documents")
-        print("5) Exit")
+        print("5) Read a document")
+        print("6) Exit")
         print("\n Please enter the number of a menu item")
 
         user_choice = input('> ')
@@ -399,21 +402,33 @@ def main():
             index.index_folder(folder)
         elif menu_item == 2:
             while True:
-                search_query = input('Please enter your word or type :quit to return to menu: ')
+                search_query = input('\nType :read to display a document or :quit to return to menu\nPlease enter your search query: ')
                 if search_query == ":quit":
                     break
-                searcher.search(search_query.split())
+                elif search_query == ":read":
+                    doc_id = input('Please enter the document id: ')
+                    print(index.documents_content[int(doc_id)])
+                else:
+                    searcher.search(search_query.split())
+
 
         elif menu_item == 3:
             index.print_index_stats()
         elif menu_item == 4:
             while True:
-                search_query = input('Please enter your document or type :quit to return to menu: ')
+                search_query = input('\nType :read to display a document or :quit to return to menu\nPlease enter your document:  ')
                 if search_query == ":quit":
                     break
-                k = input('Please enter the number of documents you want: ')
-                searcher.knn(int(search_query), int(k))
+                elif search_query == ":read":
+                    doc_id = input('Please enter the document id: ')
+                    print(index.documents_content[int(doc_id)])
+                else:
+                    k = input('Please enter the number of documents you want: ')
+                    searcher.knn(int(search_query), int(k))
         elif menu_item == 5:
+            doc_id = input('Please enter the document id: ')
+            print(index.documents_content[int(doc_id)])
+        elif menu_item == 6:
             exit(0)
         else:
             print("Unknown menu item")
