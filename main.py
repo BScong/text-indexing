@@ -282,6 +282,27 @@ class Searcher:
 
         return " ".join(seperated_words)
 
+    #gerer le cas où le mot n'existe pas
+    def searchFagins(self, word_list, k):
+        pl_list = {}
+        min_length = 100
+        cpt_doc = 0
+        c = {}
+        m = list()
+        i = 0
+        for a_word in word_list:
+            pl_list[i] = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
+            if len(pl_list[i]) < min_length:
+                min_length = pl_list[i]
+            i += 1
+        while len(c) < k & cpt_doc < min_length:
+            for pl in pl_list.items():
+                if m.count(list(pl)[cpt_doc]) < len(pl_list):
+                    m.append(list(pl)[cpt_doc])
+                else
+
+
+
 
     def search(self, word_list):
         pl = {}
