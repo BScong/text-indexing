@@ -54,7 +54,6 @@ class Index:
         self.path = path
         self.line_filters = line_preparation
         self.word_filters = word_preparation
-        self.documents_content = {}
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
@@ -228,7 +227,6 @@ class Index:
         for filename in files:
             for doc_id, text in Index.extract_data(filename, files_indexed).items():
                 # Remove punctuation from words
-                self.documents_content[doc_id] = text
                 #The maximum frequency of a word in the doc
                 max_freq = 1
 
@@ -373,8 +371,12 @@ class Searcher:
         if not bool(pl):
             print("No document found")		
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
+        output = -1
         for document, score in pl:
+            if output < 0:
+                output = document
             print('Document: ', document, '---', 'Score: ', score)
+        return output
 
     def knn(self, doc, k):
         #take the words out of the document
@@ -399,6 +401,16 @@ class Searcher:
             if count == k:
                 break
 
+def readDoc(id, folder_name):
+    file_index = id // 10 ** 6
+    id = id - file_index * 10 ** 6
+    # check if folder_name is folder
+    if folder_name[-1] != '/':
+        folder_name = folder_name + '/'
+    files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
+    arr = Index.extract_data(files[file_index], 0)
+    return arr[id]
+
 def main():
     print("\nWelcome to the research engine")
     print("==============================")
@@ -421,6 +433,7 @@ def main():
     # Prepare the RegEx to find numbers in our user input
     int_find = re.compile('\d+')
 
+    path_current = ""
     # Return to the menu after tasks were accomplished
     while True:
         print("\nWhat would you like to do?")
@@ -451,17 +464,22 @@ def main():
             folder = input('({}) > '.format(default)).strip()
             if folder == "":
                 folder = default
+
+            path_current = folder
             index.index_folder(folder)
         elif menu_item == 2:
+            default = -1
             while True:
                 search_query = input('\nType :read to display a document or :quit to return to menu\nPlease enter your search query: ')
                 if search_query == ":quit":
                     break
                 elif search_query == ":read":
-                    doc_id = input('Please enter the document id: ')
-                    print(index.documents_content[int(doc_id)])
+                    doc_id = input('Please enter the document id{}: '.format("" if default < 0 else " ({})".format(default))).strip()
+                    if doc_id == "" and default >= 0:
+                        doc_id = default
+                    print(readDoc(int(doc_id), path_current))
                 else:
-                    searcher.search(search_query.split())
+                    default = searcher.search(search_query.split())
 
 
         elif menu_item == 3:
@@ -473,13 +491,14 @@ def main():
                     break
                 elif search_query == ":read":
                     doc_id = input('Please enter the document id: ')
-                    print(index.documents_content[int(doc_id)])
+                    print(readDoc(int(doc_id), path_current))
                 else:
                     k = input('Please enter the number of documents you want: ')
                     searcher.knn(int(search_query), int(k))
         elif menu_item == 5:
             doc_id = input('Please enter the document id: ')
-            print(index.documents_content[int(doc_id)])
+
+            print(readDoc(int(doc_id), path_current))
         elif menu_item == 6:
             exit(0)
         else:
