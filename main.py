@@ -7,7 +7,9 @@ import os
 import struct
 import math
 import re
+import time
 import xml.etree.ElementTree as ElTree
+import statistics
 import terminal
 
 # pip install stemming
@@ -121,9 +123,17 @@ class Index:
             return ""
         return "".join(found.itertext())
 
+    @staticmethod
+    def sec_float_to_tuple(sec_float):
+        # (min, sec, ms)
+        return int(sec_float) // 60, int(sec_float) % 60, int(sec_float * 1000) % 1000
+
     def index_folder(self, folder_name, batch_size=10):
         # Open files from specified folder
+        start = time.monotonic()
+        batch_times = []
         try:
+            prev_index = self.docs_indexed
             # check if folder_name is folder
             if folder_name[-1] != '/':
                 folder_name = folder_name + '/'
@@ -131,10 +141,13 @@ class Index:
             files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
 
             for i in range(0, len(files), batch_size):
-
+                batch_start = time.monotonic()
                 tfs = self.process_files(files[i:min(i + batch_size, len(files))])
 
                 self.merge_save(tfs)
+                batch_times.append(time.monotonic() - batch_start)
+
+
 
                 """terminal.print_progress(min(i + batch_size, len(files)),
                                         len(files),
@@ -142,6 +155,12 @@ class Index:
                                         suffix='Complete',
                                         bar_length=80)"""
 
+            duration = Index.sec_float_to_tuple(time.monotonic() - start)
+            print("Indexed {} documents in {} files during {} batches. Total elapsed time \t {:02d}m {:02d}s {:03d}ms".format(self.docs_indexed - prev_index, len(files), len(batch_times), *duration))
+            print("Minimum batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(min(batch_times))))
+            print("Maximum batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(max(batch_times))))
+            print("Average batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(statistics.mean(batch_times))))
+            print("Median  batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(statistics.median(batch_times))))
         except Exception as e:
             # print("Error: " + str(e))
             raise e
