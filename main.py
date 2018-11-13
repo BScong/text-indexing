@@ -282,25 +282,42 @@ class Searcher:
 
         return " ".join(seperated_words)
 
-    #gerer le cas où le mot n'existe pas
+     #gerer le cas où le mot n'existe pas
     def searchFagins(self, word_list, k):
+        print(word_list)
         pl_list = {}
         min_length = 100
         cpt_doc = 0
-        c = {}
+        c = list ()
+        c_score = {}
         m = list()
         i = 0
         for a_word in word_list:
+            print("type ", len(self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)))
             pl_list[i] = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
             if len(pl_list[i]) < min_length:
-                min_length = pl_list[i]
+                min_length = len(pl_list[i])
             i += 1
-        while len(c) < k & cpt_doc < min_length:
-            for pl in pl_list.items():
-                if m.count(list(pl)[cpt_doc]) < len(pl_list):
-                    m.append(list(pl)[cpt_doc])
-                else
+        #print(len(c),"  ", k, "  ", cpt_doc, "  ", min_length, "/n")
 
+        while len(c) < k :
+            print("in")
+            for pl in pl_list.items():
+                print(len(pl))
+                print(list(pl)[cpt_doc])
+                if cpt_doc<len(pl) &  m.count(list(pl)[cpt_doc]) < len(pl_list):
+                    m.append(list(pl)[cpt_doc])
+                else:
+                    m.remove(list(pl)[cpt_doc])
+                    c.append(list(pl)[cpt_doc])
+            print(m)
+            cpt_doc += 1
+        #type : tuple liste triée par num de docs
+        print("out")
+        for doc in c:
+            for pl in pl_list.items():
+                temp_score = pl[doc]
+            c_score[doc]= temp_score/len(pl_list)
 
 
 
