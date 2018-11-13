@@ -7,7 +7,9 @@ import os
 import struct
 import math
 import re
+import time
 import xml.etree.ElementTree as ElTree
+import statistics
 import terminal
 import argparse
 
@@ -55,7 +57,6 @@ class Index:
         self.path = path
         self.line_filters = line_preparation
         self.word_filters = word_preparation
-        self.documents_content = {}
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
@@ -123,9 +124,17 @@ class Index:
             return ""
         return "".join(found.itertext())
 
+    @staticmethod
+    def sec_float_to_tuple(sec_float):
+        # (min, sec, ms)
+        return int(sec_float) // 60, int(sec_float) % 60, int(sec_float * 1000) % 1000
+
     def index_folder(self, folder_name, batch_size):
         # Open files from specified folder
+        start = time.monotonic()
+        batch_times = []
         try:
+            prev_index = self.docs_indexed
             # check if folder_name is folder
             if folder_name[-1] != '/':
                 folder_name = folder_name + '/'
@@ -133,10 +142,13 @@ class Index:
             files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
 
             for i in range(0, len(files), batch_size):
-
+                batch_start = time.monotonic()
                 tfs = self.process_files(files[i:min(i + batch_size, len(files))])
 
                 self.merge_save(tfs)
+                batch_times.append(time.monotonic() - batch_start)
+
+
 
                 """terminal.print_progress(min(i + batch_size, len(files)),
                                         len(files),
@@ -144,6 +156,12 @@ class Index:
                                         suffix='Complete',
                                         bar_length=80)"""
 
+            duration = Index.sec_float_to_tuple(time.monotonic() - start)
+            print("Indexed {} documents in {} files during {} batches. Total elapsed time \t {:02d}m {:02d}s {:03d}ms".format(self.docs_indexed - prev_index, len(files), len(batch_times), *duration))
+            print("Minimum batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(min(batch_times))))
+            print("Maximum batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(max(batch_times))))
+            print("Average batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(statistics.mean(batch_times))))
+            print("Median  batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(statistics.median(batch_times))))
         except Exception as e:
             # print("Error: " + str(e))
             raise e
@@ -229,7 +247,6 @@ class Index:
         for filename in files:
             for doc_id, text in Index.extract_data(filename, files_indexed).items():
                 # Remove punctuation from words
-                self.documents_content[doc_id] = text
                 #The maximum frequency of a word in the doc
                 max_freq = 1
 
@@ -322,8 +339,12 @@ class Searcher:
         if not bool(pl):
             print("No document found")
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
+        output = -1
         for document, score in pl:
+            if output < 0:
+                output = document
             print('Document: ', document, '---', 'Score: ', score)
+        return output
 
     def knn(self, doc, k):
         #take the words out of the document
@@ -347,6 +368,16 @@ class Searcher:
             count += 1
             if count == k:
                 break
+
+def readDoc(id, folder_name):
+    file_index = id // 10 ** 6
+    id = id - file_index * 10 ** 6
+    # check if folder_name is folder
+    if folder_name[-1] != '/':
+        folder_name = folder_name + '/'
+    files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
+    arr = Index.extract_data(files[file_index], 0)
+    return arr[id]
 
 def main():
     parser = argparse.ArgumentParser(description='Text indexing',
@@ -386,6 +417,7 @@ def main():
         exit(0)
     print("\nWelcome to the research engine")
     print("==============================")
+    path_current = ""
     # Return to the menu after tasks were accomplished
     while True:
         print("\nWhat would you like to do?")
@@ -416,17 +448,21 @@ def main():
             folder = input('({}) > '.format(default)).strip()
             if folder == "":
                 folder = default
+            path_current = folder
             index.index_folder(folder, batch_size)
         elif menu_item == 2:
+            default = -1
             while True:
                 search_query = input('\nType :read to display a document or :quit to return to menu\nPlease enter your search query: ')
                 if search_query == ":quit":
                     break
                 elif search_query == ":read":
-                    doc_id = input('Please enter the document id: ')
-                    print(index.documents_content[int(doc_id)])
+                    doc_id = input('Please enter the document id{}: '.format("" if default < 0 else " ({})".format(default))).strip()
+                    if doc_id == "" and default >= 0:
+                        doc_id = default
+                    print(readDoc(int(doc_id), path_current))
                 else:
-                    searcher.search(search_query.split())
+                    default = searcher.search(search_query.split())
 
 
         elif menu_item == 3:
@@ -438,13 +474,14 @@ def main():
                     break
                 elif search_query == ":read":
                     doc_id = input('Please enter the document id: ')
-                    print(index.documents_content[int(doc_id)])
+                    print(readDoc(int(doc_id), path_current))
                 else:
                     k = input('Please enter the number of documents you want: ')
                     searcher.knn(int(search_query), int(k))
         elif menu_item == 5:
             doc_id = input('Please enter the document id: ')
-            print(index.documents_content[int(doc_id)])
+
+            print(readDoc(int(doc_id), path_current))
         elif menu_item == 6:
             exit(0)
         else:
