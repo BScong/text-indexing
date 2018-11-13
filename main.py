@@ -294,30 +294,44 @@ class Searcher:
         i = 0
         for a_word in word_list:
             print("type ", len(self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)))
-            pl_list[i] = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
+            #sorted(d1.items(), key=lambda t: t[1])
+            pl_list[i] = OrderedDict(sorted(self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path).items(), key=lambda t: t[1],reverse=True))
+            #pl_list[i] = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
             if len(pl_list[i]) < min_length:
                 min_length = len(pl_list[i])
+                print(pl_list[i])
             i += 1
-        #print(len(c),"  ", k, "  ", cpt_doc, "  ", min_length, "/n")
 
-        while len(c) < k :
+        while (len(c) < k and cpt_doc<min_length):
             print("in")
-            for pl in pl_list.items():
-                print(len(pl))
-                print(list(pl)[cpt_doc])
-                if cpt_doc<len(pl) &  m.count(list(pl)[cpt_doc]) < len(pl_list):
-                    m.append(list(pl)[cpt_doc])
+            i=0
+            while i<len(pl_list)  :
+                #print( m.count(list(pl_list[i])[cpt_doc]))
+                print(cpt_doc)
+                print(list(pl_list[i])[cpt_doc])
+
+                if m.count(list(pl_list[i])[cpt_doc]) < (len(pl_list)-1):
+                    print("inn")
+                    m.append(list(pl_list[i])[cpt_doc])
+                    print(len(m))
                 else:
-                    m.remove(list(pl)[cpt_doc])
-                    c.append(list(pl)[cpt_doc])
-            print(m)
+                    m.remove(list(pl_list[i])[cpt_doc])
+                    c.append(list(pl_list[i])[cpt_doc])
+                i=i+1
+            print(len(c))
             cpt_doc += 1
-        #type : tuple liste triée par num de docs
-        print("out")
+            
+        #add part 3 
         for doc in c:
-            for pl in pl_list.items():
-                temp_score = pl[doc]
+            i=0
+            print(doc)
+            while i<len(pl_list):
+                temp_score = pl_list[i][doc]
+                i=i+1
             c_score[doc]= temp_score/len(pl_list)
+
+        for document, score in c_score.items():
+            print('Document: ', document, '---', 'Score: ', score)
 
 
 
