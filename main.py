@@ -11,6 +11,7 @@ import time
 import xml.etree.ElementTree as ElTree
 import statistics
 import terminal
+import argparse
 
 # pip install stemming
 from stemming.porter2 import stem
@@ -128,7 +129,7 @@ class Index:
         # (min, sec, ms)
         return int(sec_float) // 60, int(sec_float) % 60, int(sec_float * 1000) % 1000
 
-    def index_folder(self, folder_name, batch_size=10):
+    def index_folder(self, folder_name, batch_size):
         # Open files from specified folder
         start = time.monotonic()
         batch_times = []
@@ -306,11 +307,11 @@ class Searcher:
             if a_word.find('&') > -1:
                 conjonctive_part = a_word.split('&')
                 #initialise the pl with the first word
-                if conjonctive_part[0] in self.index.voc: 				
+                if conjonctive_part[0] in self.index.voc:
                     conj_pl = self.index.read_pl_for_word(*(self.index.voc[conjonctive_part[0]]), self.index.path)
                 else:
                         print(conjonctive_part[0]+" : Word not found")
-                        break					
+                        break
                 for i in range(1, len(conjonctive_part)):
                     if conjonctive_part[i] in self.index.voc:
                         # make the intersection of the documents found for all words of the conjonctive query
@@ -319,24 +320,24 @@ class Searcher:
                         keys_a = set(conj_pl.keys())
                         keys_b = set(found_pl.keys())
                         intersect_keys = keys_a & keys_b
-                        for item in intersect_keys: 					
+                        for item in intersect_keys:
                             intersect.update({item : found_pl[item] + conj_pl[item]})
-                        conj_pl = intersect							
+                        conj_pl = intersect
                     else:
                         print(conjonctive_part[i]+" : Word not found")
                         conj_pl.clear()
                         break
-                pl.update(conj_pl)						
+                pl.update(conj_pl)
             elif a_word in self.index.voc:
-                found_pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path) 				
+                found_pl = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
                 for document, score in found_pl.items():
                     if document not in pl:
-                        pl[document] = 0    
-                    pl[document] += score                    
+                        pl[document] = 0
+                    pl[document] += score
             else:
                 print(a_word+" : Word not found")
         if not bool(pl):
-            print("No document found")		
+            print("No document found")
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
         output = -1
         for document, score in pl:
@@ -379,15 +380,26 @@ def readDoc(id, folder_name):
     return arr[id]
 
 def main():
-    print("\nWelcome to the research engine")
-    print("==============================")
+    parser = argparse.ArgumentParser(description='Text indexing',
+                                     epilog='Written for the INSA Lyon text-indexing Project by Anh Pham, Mathilde du Plessix, '
+                                            'Romain Latron, Beonît Zhong, Martin Haug. 2018 All rights reserved.')
+
+    parser.add_argument('pl', help='Posting list location')
+    parser.add_argument('--eval', default=None, help='Used to eval indexing')
+    parser.add_argument('-b','--batch', type=int, default=10, help='Define the batch size')
+    args = parser.parse_args()
 
     if len(sys.argv) < 2:
         print("Please specify the name for the posting list file in an argument")
         print("Usage example: {} ./data/pl-file".format(sys.argv[0]))
         exit(-1)
 
-    path = sys.argv[1]
+    path = args.pl
+    batch_size = args.batch
+    eval = args.eval
+
+
+
     m = re.search('((?<=^["\']).*(?=["\']$))', path)
     if m is not None:
         path = m.group(0)
@@ -400,6 +412,11 @@ def main():
     # Prepare the RegEx to find numbers in our user input
     int_find = re.compile('\d+')
 
+    if eval:
+        index.index_folder(eval, batch_size)
+        exit(0)
+    print("\nWelcome to the research engine")
+    print("==============================")
     path_current = ""
     # Return to the menu after tasks were accomplished
     while True:
@@ -431,9 +448,8 @@ def main():
             folder = input('({}) > '.format(default)).strip()
             if folder == "":
                 folder = default
-
             path_current = folder
-            index.index_folder(folder)
+            index.index_folder(folder, batch_size)
         elif menu_item == 2:
             default = -1
             while True:
