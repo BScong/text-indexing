@@ -282,7 +282,7 @@ class Searcher:
 
         return " ".join(seperated_words)
 
-     #gerer le cas où le mot n'existe pas
+ #gerer le cas où le mot n'existe pas
     def searchFagins(self, word_list, k):
         print(word_list)
         pl_list = {}
@@ -293,43 +293,50 @@ class Searcher:
         m = list()
         i = 0
         for a_word in word_list:
-            print("type ", len(self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)))
-            #sorted(d1.items(), key=lambda t: t[1])
             pl_list[i] = OrderedDict(sorted(self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path).items(), key=lambda t: t[1],reverse=True))
-            #pl_list[i] = self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path)
             if len(pl_list[i]) < min_length:
                 min_length = len(pl_list[i])
-                print(pl_list[i])
             i += 1
 
-        while (len(c) < k and cpt_doc<min_length):
-            print("in")
+        while len(c) < k:
             i=0
             while i<len(pl_list)  :
-                #print( m.count(list(pl_list[i])[cpt_doc]))
-                print(cpt_doc)
-                print(list(pl_list[i])[cpt_doc])
-
-                if m.count(list(pl_list[i])[cpt_doc]) < (len(pl_list)-1):
-                    print("inn")
-                    m.append(list(pl_list[i])[cpt_doc])
-                    print(len(m))
-                else:
-                    m.remove(list(pl_list[i])[cpt_doc])
-                    c.append(list(pl_list[i])[cpt_doc])
+                if cpt_doc<len(pl_list[i]):
+                    if m.count(list(pl_list[i])[cpt_doc]) < (len(pl_list)-1):
+                        m.append(list(pl_list[i])[cpt_doc])
+                    else:
+                        m.remove(list(pl_list[i])[cpt_doc])
+                        c.append(list(pl_list[i])[cpt_doc])
                 i=i+1
-            print(len(c))
+
             cpt_doc += 1
-            
-        #add part 3 
+
+        #add part 3
+        i=0
+        while i<len(pl_list):
+         pl_list[i]= OrderedDict(sorted(pl_list[i].items(), key=lambda t: t[0]))
+         i=i+1
+
+
         for doc in c:
             i=0
+            temp_score=0
             print(doc)
             while i<len(pl_list):
-                temp_score = pl_list[i][doc]
+                temp_score = temp_score+pl_list[i][doc]
                 i=i+1
             c_score[doc]= temp_score/len(pl_list)
 
+        for doc in m:
+            i=0
+            temp_score=0
+            while i<len(pl_list):
+                if doc in pl_list[i]:
+                    temp_score= temp_score + pl_list[i][doc]
+                c_score[doc]=temp_score/len(pl_list)
+                i=i+1
+
+        c_score =OrderedDict(sorted(c_score.items(), key=lambda t: t[1], reverse=True))
         for document, score in c_score.items():
             print('Document: ', document, '---', 'Score: ', score)
 
