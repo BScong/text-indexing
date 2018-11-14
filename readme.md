@@ -3,6 +3,15 @@
 ## Goal
 The goal of this project is to index every word from a large set of documents, in order to perform searches on them (simple, conjonctive, disjonctive searches), sorted by relevance.
 
+## Usage
+`python3 main.py [-h] [--eval EVAL] [-b BATCH] [-l] pl_file_path`
+You have to execute `main.py` by giving it a path for the Posting List file. It overrides it by default.
+
+Options:
+ - `-l`,`--load`: load the current Posting List and vocabulary. The vocabulary is stored at path (`pl_file_path+'_voc'`).
+ - `--eval`: used to measure batch processing times. Need to specify a folder to index as a parameter.
+ - `-b`,`--batch`: to specify a batch size.
+
 ## Principle
 
 ### Vocabulary and Posting List
