@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ElTree
 import statistics
 import terminal
 import argparse
+import pickle
 
 # pip install stemming
 from stemming.porter2 import stem
@@ -47,7 +48,7 @@ class StemmingPreparation(IWordPreparation):
 
 
 class Index:
-    def __init__(self, path, line_preparation, word_preparation):
+    def __init__(self, path, line_preparation, word_preparation, load=False):
 
         self.docs_indexed = 0
         # In-memory representation of the posting list
@@ -55,8 +56,21 @@ class Index:
         self.voc = {}
         self.count = {}
         self.path = path
+        self.voc_path = path + '_voc'
         self.line_filters = line_preparation
         self.word_filters = word_preparation
+        if load:
+            self.load_voc()
+
+
+    def save_voc(self):
+        with open(self.voc_path, 'wb') as f:
+            pickle.dump(self.voc, f, pickle.HIGHEST_PROTOCOL)
+
+    def load_voc(self):
+        with open(self.voc_path, 'rb') as f:
+            self.voc = pickle.load(f)
+
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
@@ -162,6 +176,7 @@ class Index:
             print("Maximum batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(max(batch_times))))
             print("Average batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(statistics.mean(batch_times))))
             print("Median  batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Index.sec_float_to_tuple(statistics.median(batch_times))))
+            self.save_voc()
         except Exception as e:
             # print("Error: " + str(e))
             raise e
@@ -387,6 +402,7 @@ def main():
     parser.add_argument('pl', help='Posting list location')
     parser.add_argument('--eval', default=None, help='Used to eval indexing')
     parser.add_argument('-b','--batch', type=int, default=10, help='Define the batch size')
+    parser.add_argument('-l','--load', dest='load', action='store_true')
     args = parser.parse_args()
 
     if len(sys.argv) < 2:
@@ -407,7 +423,7 @@ def main():
     line_filters = [LowercasePreparation(), DeleteCharacterPreparation()]
     word_filters = [StemmingPreparation()]
     # Get a instance of our index and search
-    index = Index(path, line_filters, word_filters)
+    index = Index(path, line_filters, word_filters, args.load)
     searcher = Searcher(index, line_filters, word_filters)
     # Prepare the RegEx to find numbers in our user input
     int_find = re.compile('\d+')
