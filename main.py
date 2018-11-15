@@ -430,7 +430,7 @@ def main():
 
     if eval:
         index.index_folder(eval, batch_size)
-        exit(0)
+        return
     print("\nWelcome to the research engine")
     print("==============================")
     path_current = ""
