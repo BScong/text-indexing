@@ -1,0 +1,33 @@
+1000
+{'real': 165.696, 'user': 163.74099999999999, 'sys': 2.115}
+165.699333593
+700
+{'real': 264.39, 'user': 251.36, 'sys': 13.249}
+264.39327786
+500
+Command 'time mprof run python3 ../main.py ../data/pl-eval -b 500 --eval ../data/latimes > result_500.txt' returned non-zero exit status 1.
+236.081755585
+300
+{'real': 292.495, 'user': 274.998, 'sys': 17.681}
+292.497557721
+200
+{'real': 333.797, 'user': 311.113, 'sys': 22.937}
+333.8000523700001
+100
+{'real': 562.034, 'user': 511.959, 'sys': 50.47}
+562.0363575370002
+50
+{'real': 915.209, 'user': 820.884, 'sys': 94.922}
+915.06044337
+20
+{'real': 2075.607, 'user': 1841.259, 'sys': 235.945}
+2075.6044341969996
+10
+not enough values to unpack (expected 2, got 1)
+3447.2208181040005
+5
+not enough values to unpack (expected 2, got 1)
+1991.0020980680001
+1
+not enough values to unpack (expected 2, got 1)
+620.4886823720008

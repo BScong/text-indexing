@@ -1,0 +1,6 @@
+Indexed 131896 documents in 730 files during 2 batches. Total elapsed time 	 04m 36s 772ms
+Minimum batch time: 	 02m 08s 533ms
+Maximum batch time: 	 02m 28s 232ms
+Average batch time: 	 02m 18s 383ms
+Median  batch time: 	 02m 18s 383ms
+mprof: Sampling memory every 0.1s

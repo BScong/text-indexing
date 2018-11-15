@@ -39,3 +39,12 @@ For each batch, we build a posting list in memory. When this PL is built, we mer
 
 ### Stemming
 Stemming is also implemented to regroup words from the same semantic family.
+
+## Benchmark
+The following benchmarks have been made on the entire dataset (131896 documents in 730 files).
+We wanted to see the impact of the size of each batch on memory consumption and running time.
+
+![Plot of running time depending on batch size](https://github.com/BScong/text-indexing/blob/master/benchmark/measures_1_clean/time.png)
+
+
+![Plot of maximum memory consumption depending on batch size](https://github.com/BScong/text-indexing/blob/master/benchmark/measures_1_clean/memory.png)
