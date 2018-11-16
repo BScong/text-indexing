@@ -12,7 +12,7 @@ import doc_utils
 
 
 class Index:
-    def __init__(self, path, line_preparation, word_preparation, load=False):
+    def __init__(self, path, line_preparation, word_preparation, load=False, verbose=True):
 
         self.docs_indexed = 0
         # In-memory representation of the posting list
@@ -24,7 +24,13 @@ class Index:
         self.line_filters = line_preparation
         self.word_filters = word_preparation
         if load:
+            timer = Timer()
+            timer.start()
             self.load_voc()
+            timer.stop()
+            if verbose:
+                tuple_time = timer.get_duration_tuple()
+                print("Loaded saved data in {}s {}ms".format(tuple_time[1], tuple_time[2]))
 
     def save_voc(self):
         with open(self.voc_path, 'wb') as f:
@@ -38,9 +44,12 @@ class Index:
     def load_voc(self):
         with open(self.voc_path, 'rb') as f:
             data = pickle.load(f)
-            self.docs_indexed = data['docs_indexed']
-            self.count = data['count']
-            self.voc = data['voc']
+            try:
+                self.docs_indexed = data['docs_indexed']
+                self.count = data['count']
+                self.voc = data['voc']
+            except KeyError as e:
+                print("Your index file data version is too low. Loading failed.")
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
