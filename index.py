@@ -28,11 +28,19 @@ class Index:
 
     def save_voc(self):
         with open(self.voc_path, 'wb') as f:
-            pickle.dump(self.voc, f, pickle.HIGHEST_PROTOCOL)
+            data = {
+                'docs_indexed':self.docs_indexed,
+                'count':self.count,
+                'voc':self.voc
+            }
+            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 
     def load_voc(self):
         with open(self.voc_path, 'rb') as f:
-            self.voc = pickle.load(f)
+            data = pickle.load(f)
+            self.docs_indexed = data['docs_indexed']
+            self.count = data['count']
+            self.voc = data['voc']
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
