@@ -13,7 +13,7 @@ import statistics
 import terminal
 
 # pip install stemming
-from stemming.porter2 import stem
+#from stemming.porter2 import stem
 
 class ILinePreparation:
     def prepare_line(self, line):
@@ -304,10 +304,9 @@ class Searcher:
         print(word_list)
         pl_list = {}
         min_length = 100
-        cpt_doc = 0
-        c = list ()
-        c_score = {}
-        m = list()
+        line = 0
+        c = {}
+        m = {}
         i = 0
         for a_word in word_list:
             pl_list[i] = OrderedDict(sorted(self.index.read_pl_for_word(*(self.index.voc[a_word]), self.index.path).items(), key=lambda t: t[1],reverse=True))
@@ -315,48 +314,51 @@ class Searcher:
                 min_length = len(pl_list[i])
             i += 1
 
+        #endless loop when k bigger than the real result
         while len(c) < k:
-            i=0
-            while i<len(pl_list)  :
-                if cpt_doc<len(pl_list[i]):
-                    if m.count(list(pl_list[i])[cpt_doc]) < (len(pl_list)-1):
-                        m.append(list(pl_list[i])[cpt_doc])
+            i = 0
+            while i < len(pl_list):
+                if line < len(pl_list[i]):
+                    doc_id = list(pl_list[i])[line]
+
+                    if doc_id in m.keys():
+                        old_score = m[doc_id][0]
+                        #print(old_score)
+                        m[doc_id][1].append(i)
+                        #print(m[doc_id])
+                        m[doc_id] = (((old_score + pl_list[i][doc_id]) / len(m[doc_id][1])), m[doc_id][1])
+                        if len(m[doc_id][1]) == len(pl_list):
+                            c[doc_id] = m[doc_id][0]
+                            del m[doc_id]
                     else:
-                        m.remove(list(pl_list[i])[cpt_doc])
-                        c.append(list(pl_list[i])[cpt_doc])
-                i=i+1
+                        # Dans M: doc_id -> (score, liste des pl)
+                        pl_visited = list()
+                        pl_visited.append(i)
+                        m[doc_id] = (pl_list[i][doc_id], pl_visited)
+                        #print(m[doc_id])
 
-            cpt_doc += 1
+                i += 1
+            line += 1
 
-        #add part 3
-        i=0
-        while i<len(pl_list):
-         pl_list[i]= OrderedDict(sorted(pl_list[i].items(), key=lambda t: t[0]))
-         i=i+1
+        for doc in m.keys():
+            i = 0
+            temp_score = m[doc][0]
+            temp_length = len(m[doc][1])
+            while i < len(pl_list):
+                if i not in m[doc][1]:
+                    if doc in pl_list[i]:
+                        temp_length += 1
+                        temp_score = (temp_score + pl_list[i][doc]) / temp_length
+                i += 1
+            #check if current doc is in all posting lists and its score is greater than min score in C
+            if temp_length == len(pl_list) and temp_score > min(c.values()):
+                min_entry = min(c, key=c.get)
+                del c[min_entry]
+                c[doc] = temp_score
 
-
-        for doc in c:
-            i=0
-            temp_score=0
-            print(doc)
-            while i<len(pl_list):
-                temp_score = temp_score+pl_list[i][doc]
-                i=i+1
-            c_score[doc]= temp_score/len(pl_list)
-
-        for doc in m:
-            i=0
-            temp_score=0
-            while i<len(pl_list):
-                if doc in pl_list[i]:
-                    temp_score= temp_score + pl_list[i][doc]
-                c_score[doc]=temp_score/len(pl_list)
-                i=i+1
-
-        c_score =OrderedDict(sorted(c_score.items(), key=lambda t: t[1], reverse=True))
-        for document, score in c_score.items():
+        c = OrderedDict(sorted(c.items(), key=lambda t: t[1], reverse=True))
+        for document, score in c.items():
             print('Document: ', document, '---', 'Score: ', score)
-
 
     def search(self, word_list):
         pl = {}
@@ -467,7 +469,8 @@ def main():
         print("3) Show stats about the index")
         print("4) Look for similar documents")
         print("5) Read a document")
-        print("6) Exit")
+        print("6) Search with Fagin")
+        print("7) Exit")
         print("\n Please enter the number of a menu item")
 
         user_choice = input('> ')
@@ -525,6 +528,10 @@ def main():
 
             print(readDoc(int(doc_id), path_current))
         elif menu_item == 6:
+            k = input('Please enter k: ')
+            search_query = input('Please enter your search query: ')
+            searcher.searchFagins(search_query.split(), int(k))
+        elif menu_item == 7:
             exit(0)
         else:
             print("Unknown menu item")
