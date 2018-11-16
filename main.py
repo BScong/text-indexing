@@ -6,6 +6,7 @@ import io
 import os
 import struct
 import math
+import numpy
 import re
 import xml.etree.ElementTree as ElTree
 import terminal
@@ -51,6 +52,9 @@ class Index:
         self.__binary_pl = io.BytesIO(b"")
         self.voc = {}
         self.count = {}
+        self.index_vectors = {}
+        self.context_vectors = {}
+        self.vectors_size = 200
         self.path = path
         self.line_filters = line_preparation
         self.word_filters = word_preparation
@@ -225,6 +229,15 @@ class Index:
         tf_per_doc = {}
         for filename in files:
             for doc_id, text in Index.extract_data(filename, files_indexed).items():
+                #Create index vectors
+                vect = numpy.zeros(self.vectors_size)
+                for i in range(1, 3):
+                    rand = int (self.vectors_size * numpy.random.random_sample())
+                    vect[rand] = 1
+                for i in range(1, 3):
+                    rand = int(self.vectors_size * numpy.random.random_sample())
+                    vect[rand] = -1
+                self.index_vectors[doc_id] = vect
                 # Remove punctuation from words
 
                 #The maximum frequency of a word in the doc
@@ -237,9 +250,13 @@ class Index:
                 words = [x for x in words if not x == ""]
 
                 for w in words:
-                    # Set up dictionary
+                    # Set up dictionary, construct context vectors
                     if w not in tf_per_doc:
                         tf_per_doc[w] = {}
+                    if w not in self.context_vectors.keys():
+                        self.context_vectors[w] = numpy.zeros(self.vectors_size)
+                    self.context_vectors[w] += vect
+                    self.context_vectors[w] = self.context_vectors[w] / numpy.linalg.norm(self.context_vectors[w])
                     if doc_id not in tf_per_doc[w]:
                         tf_per_doc[w][doc_id] = 0
                     tf_per_doc[w][doc_id] += 1
@@ -259,6 +276,8 @@ class Index:
         print(len(self.voc))
         print('====')
         print(self.docs_indexed)
+        print (self.context_vectors)
+
         # TODO MOOOORE
 
 
@@ -322,7 +341,7 @@ class Searcher:
         for document, score in pl:
             print('Document: ', document, '---', 'Score: ', score)
 
-    def knn(self, doc, k):
+    def naive_knn(self, doc, k):
         #take the words out of the document
         doc_pl = {}
         for word in self.index.voc:
@@ -345,6 +364,51 @@ class Searcher:
             if count == k:
                 break
 
+    def knn(self, doc, k):
+        doc_vect = numpy.zeros(self.index.vectors_size)
+        for word in self.index.voc:
+            found_pl = self.index.read_pl_for_word(*(self.index.voc[word]), self.index.path)
+            if doc in found_pl.keys():
+                doc_vect += self.index.context_vectors[word]
+        doc_dist = {}
+        for document, vector in self.index.index_vectors.items():
+            doc_dist[document] = numpy.dot(doc_vect, vector)
+        doc_dist = sorted(doc_dist.items(), key=lambda kv: kv[1], reverse=True)
+        count = 0
+        for document, score in doc_dist:
+            print('Document: ', document, '---', 'Score: ', score)
+            count += 1
+            if count == k:
+                break
+
+    def similarWord(self, word, k):
+        if word not in self.index.voc:
+            print("Word not found")
+            return
+        context_vec = self.index.context_vectors[word]
+        word_scores = {}
+        for w in self.index.voc:
+            word_scores[w] = numpy.dot(self.index.context_vectors[w], context_vec)
+        word_scores[word] = 0
+        word_scores = sorted(word_scores.items(), key=lambda kv: kv[1], reverse=True)
+        count = 0
+        for w, score in word_scores:
+            print(w, '---', 'Score: ', score)
+            count += 1
+            if count == k:
+                break
+
+def readDoc(id, folder_name):
+    file_index = id // 10 ** 6
+    id = id - file_index * 10 ** 6
+    # check if folder_name is folder
+    if folder_name[-1] != '/':
+        folder_name = folder_name + '/'
+    files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
+    arr = Index.extract_data(files[file_index], 0)
+    return arr[id]
+
+
 def main():
     print("\nWelcome to the research engine")
     print("==============================")
@@ -366,6 +430,8 @@ def main():
     searcher = Searcher(index, line_filters, word_filters)
     # Prepare the RegEx to find numbers in our user input
     int_find = re.compile('\d+')
+    path_current = ""
+
 
     # Return to the menu after tasks were accomplished
     while True:
@@ -396,6 +462,7 @@ def main():
             folder = input('({}) > '.format(default)).strip()
             if folder == "":
                 folder = default
+            path_current = folder
             index.index_folder(folder)
         elif menu_item == 2:
             while True:
@@ -414,6 +481,15 @@ def main():
                 k = input('Please enter the number of documents you want: ')
                 searcher.knn(int(search_query), int(k))
         elif menu_item == 5:
+            doc_id = input('Please enter the document id: ')
+            print(readDoc(int(doc_id), path_current))
+        elif menu_item == 6:
+            search_query = input('Please enter a word or type :quit to return to menu: : ')
+            if search_query == ":quit":
+                break
+            k = input('Please enter the number of words you want: ')
+            searcher.similarWord(search_query, int(k))
+        elif menu_item == 7:
             exit(0)
         else:
             print("Unknown menu item")
