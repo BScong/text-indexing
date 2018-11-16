@@ -282,7 +282,7 @@ class Searcher:
 
         return " ".join(seperated_words)
 
- #gerer le cas où le mot n'existe pas
+     #gerer le cas où le mot n'existe pas
     def searchFagins(self, word_list, k):
         print(word_list)
         pl_list = {}
@@ -339,7 +339,6 @@ class Searcher:
         c_score =OrderedDict(sorted(c_score.items(), key=lambda t: t[1], reverse=True))
         for document, score in c_score.items():
             print('Document: ', document, '---', 'Score: ', score)
-
 
 
     def search(self, word_list):
