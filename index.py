@@ -6,12 +6,13 @@ from os import listdir
 from os.path import isfile, join
 import math
 import statistics
+import pickle
 from timer import Timer
 import doc_utils
 
 
 class Index:
-    def __init__(self, path, line_preparation, word_preparation):
+    def __init__(self, path, line_preparation, word_preparation, load=False):
 
         self.docs_indexed = 0
         # In-memory representation of the posting list
@@ -19,8 +20,19 @@ class Index:
         self.voc = {}
         self.count = {}
         self.path = path
+        self.voc_path = path + '_voc'
         self.line_filters = line_preparation
         self.word_filters = word_preparation
+        if load:
+            self.load_voc()
+
+    def save_voc(self):
+        with open(self.voc_path, 'wb') as f:
+            pickle.dump(self.voc, f, pickle.HIGHEST_PROTOCOL)
+
+    def load_voc(self):
+        with open(self.voc_path, 'rb') as f:
+            self.voc = pickle.load(f)
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
@@ -79,7 +91,7 @@ class Index:
         # see slide 10
         return math.log10(self.docs_indexed / (1 + num_where_appeared))
 
-    def index_folder(self, folder_name, batch_size=10):
+    def index_folder(self, folder_name, batch_size):
         # Open files from specified folder
         timer = Timer()
         timer.start()
@@ -104,18 +116,18 @@ class Index:
                                         suffix='Complete',
                                         bar_length=80)"""
 
-            timer.stop(last_round=False)
+            timer.stop()
             batch_times = timer.get_round_durations()
             batch_times.pop(0)
-
             print("Indexed {} documents in {} files during {} batches. Total elapsed time \t {:02d}m {:02d}s {:03d}ms"
-                  .format(self.docs_indexed - prev_index, len(files), len(batch_times), *(timer.get_duration_tuple())))
+                  .format(self.docs_indexed - prev_index, len(files), len(batch_times), *timer.get_duration_tuple()))
             print("Minimum batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Timer.time_to_tuple(min(batch_times))))
             print("Maximum batch time: \t {:02d}m {:02d}s {:03d}ms".format(*Timer.time_to_tuple(max(batch_times))))
             print("Average batch time: \t {:02d}m {:02d}s {:03d}ms"
                   .format(*Timer.time_to_tuple(statistics.mean(batch_times))))
             print("Median  batch time: \t {:02d}m {:02d}s {:03d}ms"
                   .format(*Timer.time_to_tuple(statistics.median(batch_times))))
+            self.save_voc()
         except Exception as e:
             # print("Error: " + str(e))
             raise e
@@ -128,7 +140,7 @@ class Index:
 
             if w in tf_per_doc:
                 for old_document in pl:
-                    pl[old_document] = pl[old_document] / self.count[w][1] \
+                    pl[old_document] = pl[old_document] / self.count[w][1]\
                         if self.count[w][1] != 0 else pl[old_document]
 
                 for new_document, term_frequency in tf_per_doc[w].items():
@@ -175,8 +187,8 @@ class Index:
                 # The maximum frequency of a word in the doc
                 max_freq = 1
 
-                for filter_tool in self.line_filters:
-                    text = filter_tool.prepare_line(text)
+                for line_filter in self.line_filters:
+                    text = line_filter.prepare_line(text)
                 words = text.split(" ")
                 words = [self.apply_word_filters(x) for x in words]
                 words = [x for x in words if not x == ""]

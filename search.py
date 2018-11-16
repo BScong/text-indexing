@@ -8,14 +8,14 @@ class Searcher:
         self.line_filters = line_filters
 
     def prepare_query(self, query):
-        for filter_tool in self.line_filters:
-            query = filter_tool.prepare_line(query)
+        for line_filter in self.line_filters:
+            query = line_filter.prepare_line(query)
 
         separated_words = query.split(" ")
 
         for i in range(len(separated_words)):
-            for filter_tool in self.word_filters:
-                separated_words[i] = filter_tool.prepare_word(separated_words[i])
+            for line_filter in self.word_filters:
+                separated_words[i] = line_filter.prepare_word(separated_words[i])
 
         return " ".join(separated_words)
 
@@ -30,8 +30,8 @@ class Searcher:
                 if conjunctive_part[0] in self.index.voc:
                     conj_pl = self.index.read_pl_for_word(*(self.index.voc[conjunctive_part[0]]), self.index.path)
                 else:
-                        print(conjunctive_part[0]+" : Word not found")
-                        break
+                    print(conjunctive_part[0] + " : Word not found")
+                    break
                 for i in range(1, len(conjunctive_part)):
                     if conjunctive_part[i] in self.index.voc:
                         # make the intersection of the documents found for all words of the conjunctive query
@@ -61,9 +61,10 @@ class Searcher:
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
         output = -1
         timer.stop()
+        time_tuple = timer.get_duration_tuple()
         if verbose:
-            duration_tuple = timer.get_duration_tuple()
-            print("Query results returned in {}s, {}ms".format(duration_tuple[1], duration_tuple[2]))
+            print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
+
         for document, score in pl:
             if output < 0:
                 output = document
@@ -90,9 +91,10 @@ class Searcher:
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
         count = 0
         timer.stop()
+        time_tuple = timer.get_duration_tuple()
         if verbose:
-            duration_tuple = timer.get_duration_tuple()
-            print("Query results returned in {}s, {}ms".format(duration_tuple[1], duration_tuple[2]))
+            print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
+
         for document, score in pl:
             print('Document: ', document, '---', 'Score: ', score)
             count += 1
