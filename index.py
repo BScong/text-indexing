@@ -116,7 +116,7 @@ class Index:
                                         suffix='Complete',
                                         bar_length=80)"""
 
-            timer.stop()
+            timer.stop(last_round=False)
             batch_times = timer.get_round_durations()
             batch_times.pop(0)
             print("Indexed {} documents in {} files during {} batches. Total elapsed time \t {:02d}m {:02d}s {:03d}ms"
