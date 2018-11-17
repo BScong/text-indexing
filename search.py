@@ -1,6 +1,7 @@
 from timer import Timer
 from collections import OrderedDict
 
+import numpy
 
 class Searcher:
     def __init__(self, index, line_filters, word_filters):
@@ -205,3 +206,23 @@ class Searcher:
             count += 1
             if count == k:
                 break
+
+    def similarWord(self, word, k):
+        if word not in self.index.voc:
+            print("Word not found")
+            return
+        context_vec = self.index.context_vectors[word]
+        word_scores = {}
+        for w in self.index.voc:
+            word_scores[w] = numpy.dot(self.index.context_vectors[w], context_vec)
+        word_scores[word] = 0
+        word_scores = sorted(word_scores.items(), key=lambda kv: kv[1], reverse=True)
+        count = 0
+        for w, score in word_scores:
+            print(w, '---', 'Score: ', score)
+            count += 1
+            if count == k:
+                break
+
+
+
