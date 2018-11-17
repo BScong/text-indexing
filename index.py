@@ -5,6 +5,7 @@ import os
 from os import listdir
 from os.path import isfile, join
 import math
+import numpy
 import statistics
 import pickle
 from timer import Timer
@@ -19,6 +20,9 @@ class Index:
         self.__binary_pl = io.BytesIO(b"")
         self.voc = {}
         self.count = {}
+        self.index_vectors = {}
+        self.context_vectors = {}
+        self.vectors_size = 200
         self.path = path
         self.voc_path = path + '_voc'
         self.line_filters = line_preparation
@@ -200,6 +204,16 @@ class Index:
         tf_per_doc = {}
         for filename in files:
             for doc_id, text in doc_utils.extract_data(filename, files_indexed).items():
+                # Create index vectors
+                vect = numpy.zeros(self.vectors_size)
+                for i in range(1, 3):
+                    rand = int(self.vectors_size * numpy.random.random_sample())
+                    vect[rand] = 1
+                for i in range(1, 3):
+                    rand = int(self.vectors_size * numpy.random.random_sample())
+                    vect[rand] = -1
+                self.index_vectors[doc_id] = vect
+
                 # Remove punctuation from words
                 # The maximum frequency of a word in the doc
                 max_freq = 1
@@ -214,6 +228,10 @@ class Index:
                     # Set up dictionary
                     if w not in tf_per_doc:
                         tf_per_doc[w] = {}
+                        if w not in self.context_vectors.keys():
+                            self.context_vectors[w] = numpy.zeros(self.vectors_size)
+                        self.context_vectors[w] += vect
+                        self.context_vectors[w] = self.context_vectors[w] / numpy.linalg.norm(self.context_vectors[w])
                     if doc_id not in tf_per_doc[w]:
                         tf_per_doc[w][doc_id] = 0
                     tf_per_doc[w][doc_id] += 1

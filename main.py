@@ -57,7 +57,8 @@ def main():
         print("3) Show stats about the index")
         print("4) Look for similar documents")
         print("5) Read a document")
-        print("6) Exit")
+        print("6) Look for semantically similar words")
+        print("7) Exit")
         print("\n Please enter the number of a menu item")
 
         user_choice = input('> ')
@@ -118,8 +119,17 @@ def main():
             doc_id = input('Please enter the document id: ')
             print(reader.read_doc(int(doc_id)))
 
+
         elif menu_item == 6:
+            search_query = input('Please enter a word or type :quit to return to menu: : ')
+            if search_query == ":quit":
+                break
+            k = input('Please enter the number of words you want: ')
+            searcher.similarWord(search_query, int(k))
+
+        elif menu_item == 7:
             exit(0)
+
 
         else:
             print("Unknown menu item")
