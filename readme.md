@@ -3,6 +3,15 @@
 ## Goal
 The goal of this project is to index every word from a large set of documents, in order to perform searches on them (simple, conjonctive, disjonctive searches), sorted by relevance.
 
+## Usage
+`python3 main.py [-h] [--eval EVAL] [-b BATCH] [-l] pl_file_path`
+You have to execute `main.py` by giving it a path for the Posting List file. It overrides it by default.
+
+Options:
+ - `-l`,`--load`: load the current Posting List and vocabulary. The vocabulary is stored at path (`pl_file_path+'_voc'`).
+ - `--eval`: used to measure batch processing times. Need to specify a folder to index as a parameter.
+ - `-b`,`--batch`: to specify a batch size.
+
 ## Principle
 
 ### Vocabulary and Posting List
@@ -30,3 +39,12 @@ For each batch, we build a posting list in memory. When this PL is built, we mer
 
 ### Stemming
 Stemming is also implemented to regroup words from the same semantic family.
+
+## Benchmark
+The following benchmarks have been made on the entire dataset (131896 documents in 730 files).
+We wanted to see the impact of the size of each batch on memory consumption and running time.
+
+![Plot of running time depending on batch size](https://github.com/BScong/text-indexing/blob/master/benchmark/measures_1_clean/time.png)
+
+
+![Plot of maximum memory consumption depending on batch size](https://github.com/BScong/text-indexing/blob/master/benchmark/measures_1_clean/memory.png)
