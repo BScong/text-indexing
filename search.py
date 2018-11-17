@@ -1,4 +1,5 @@
 from timer import Timer
+from collections import OrderedDict
 
 
 class Searcher:
@@ -70,6 +71,110 @@ class Searcher:
                 output = document
             print('Document: ', document, '---', 'Score: ', score)
         return output
+
+    def searchFagins(self, word_list, k, verbose=True):
+        timer = Timer()
+        timer.start()
+        print(word_list)
+        pl_list = {}
+        line = 0
+        c = {}
+        m = {}
+        min_length = 100
+        i = 0
+
+        # for conjunctive query, if a word is not found then no documents are returned
+        for a_word in word_list:
+            if a_word.find('&') > -1:
+                conjunctive_part = a_word.split('&')
+                for j in range(0, len(conjunctive_part)):
+                    if conjunctive_part[j] in self.index.voc:
+                        pl_list[i] = OrderedDict(
+                            sorted(self.index.read_pl_for_word(*(self.index.voc[conjunctive_part[j]]),
+                                   self.index.path).items(),
+                                   key=lambda t: t[1], reverse=True))
+                        if len(pl_list[i]) < min_length:
+                            min_length = len(pl_list[i])
+                        i += 1
+                    else:
+                        print(conjunctive_part[j] + " : Word not found")
+                        print("No documents found")
+                        return
+            #disjunctive query
+            else:
+                if a_word in self.index.voc:
+                    pl_list[i] = OrderedDict(
+                        sorted(self.index.read_pl_for_word(*(self.index.voc[a_word]),
+                                                           self.index.path).items(),
+                               key=lambda t: t[1], reverse=True))
+                    if len(pl_list[i]) < min_length:
+                        min_length = len(pl_list[i])
+                    i += 1
+                else:
+                    print(a_word + " : Word not found")
+
+
+        #stops when C has k elements or we finished going through all the lines of pl
+        while line < min_length and len(c) < k:
+            i = 0
+            while i < len(pl_list):
+                #iterate on each line of each pl
+                if line < len(pl_list[i]):
+                    doc_id = list(pl_list[i])[line]
+                    if doc_id in m.keys():
+                        old_score = m[doc_id][0]
+                        m[doc_id][1].append(i)
+                        m[doc_id] = (((old_score + pl_list[i][doc_id]) / len(m[doc_id][1])), m[doc_id][1])
+                        if len(m[doc_id][1]) == len(pl_list):
+                            c[doc_id] = m[doc_id][0]
+                            del m[doc_id]
+                    else:
+                        # Dans M: doc_id -> (score, liste des pl)
+                        pl_visited = list()
+                        pl_visited.append(i)
+                        m[doc_id] = (pl_list[i][doc_id], pl_visited)
+                i += 1
+            line += 1
+
+        for doc in m.keys():
+            temp_score = m[doc][0]
+            temp_length = len(m[doc][1])
+            for i in range(0, len(pl_list)):
+                if i not in m[doc][1]:
+                    if doc in pl_list[i]:
+                        temp_score = ((temp_score * temp_length) + pl_list[i][doc]) / (temp_length + 1)
+                        temp_length += 1
+                    #score set to 0 when doc not in pl
+                    else:
+                        temp_score = temp_score * temp_length / (temp_length + 1)
+                        temp_length += 1
+
+            # check if current doc is in all posting lists and its score is greater than min score in C
+            if c:
+                if temp_score > min(c.values()) and len(c) == k:
+                    min_entry = min(c, key=c.get)
+                    del c[min_entry]
+                    c[doc] = temp_score
+                #case where C not full yet
+                elif len(c) < k:
+                    c[doc] = temp_score
+            #if c is empty
+            else:
+                c[doc] = temp_score
+
+        c = OrderedDict(sorted(c.items(), key=lambda t: t[1], reverse=True))
+        output = -1
+        timer.stop()
+        time_tuple = timer.get_duration_tuple()
+        if verbose:
+            print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
+
+        for document, score in c.items():
+            if output < 0:
+                output = document
+            print('Document: ', document, '---', 'Score: ', score)
+        return output
+
 
     def knn(self, doc, k, verbose=True):
         # take the words out of the document
