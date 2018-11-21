@@ -206,10 +206,10 @@ class Index:
             for doc_id, text in doc_utils.extract_data(filename, files_indexed).items():
                 # Create index vectors
                 vect = numpy.zeros(self.vectors_size)
-                for i in range(1, 3):
+                for i in range(1, 4):
                     rand = int(self.vectors_size * numpy.random.random_sample())
                     vect[rand] = 1
-                for i in range(1, 3):
+                for i in range(1, 4):
                     rand = int(self.vectors_size * numpy.random.random_sample())
                     vect[rand] = -1
                 self.index_vectors[doc_id] = vect
