@@ -41,7 +41,9 @@ class Index:
             data = {
                 'docs_indexed':self.docs_indexed,
                 'count':self.count,
-                'voc':self.voc
+                'voc':self.voc,
+                'index_vectors':self.index_vectors,
+                'context_vectors':self.context_vectors
             }
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 
@@ -52,6 +54,8 @@ class Index:
                 self.docs_indexed = data['docs_indexed']
                 self.count = data['count']
                 self.voc = data['voc']
+                self.index_vectors = data['index_vectors']
+                self.context_vectors = data['context_vectors']
             except KeyError as e:
                 print("Your index file data version is too low. Loading failed.")
 
