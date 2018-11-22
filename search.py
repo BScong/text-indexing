@@ -59,16 +59,14 @@ class Searcher:
         if not bool(pl):
             print("No document found")
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
-        output = -1
+        output = []
         timer.stop()
         time_tuple = timer.get_duration_tuple()
         if verbose:
             print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
 
         for document, score in pl:
-            if output < 0:
-                output = document
-            print('Document: ', document, '---', 'Score: ', score)
+            output.append({'document': document, 'score': score})
         return output
 
     def knn(self, doc, k, verbose=True):

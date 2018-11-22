@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--eval', default=None, help='Used to eval indexing')
     parser.add_argument('-b','--batch', type=int, default=10, help='Define the batch size')
     parser.add_argument('-l','--load', dest='load', action='store_true')
+    parser.add_argument('-t','--title', help='Display document titles in the search results', action='store_true')
     args = parser.parse_args()
 
     if len(sys.argv) < 2:
@@ -81,7 +82,7 @@ def main():
                 folder = default
             path_current = folder
             index.index_folder(folder, batch_size)
-            reader = Reader(path_current)
+            reader = Reader(index)
         elif menu_item == 2:
             default = -1
             while True:
@@ -96,7 +97,14 @@ def main():
                         doc_id = default
                     print(reader.read_doc(int(doc_id)))
                 else:
-                    default = searcher.search(search_query.split())
+                    results = searcher.search(search_query.split())
+                    for result in results:
+                        if args.title:
+                            print("no. {:08}\t{}\t--- {}".format(result['document'], reader.get_doc_title(result['document']), result['score']))
+                        else:
+                            print("no. {:08} --- {}".format(result['document'], result['score']))
+                    if len(results) >= 1:
+                        default = results[0]['document']
 
         elif menu_item == 3:
             index.print_index_stats()

@@ -23,6 +23,7 @@ class Index:
         self.voc_path = path + '_voc'
         self.line_filters = line_preparation
         self.word_filters = word_preparation
+        self.directories = []
         if load:
             timer = Timer()
             timer.start()
@@ -35,21 +36,28 @@ class Index:
     def save_voc(self):
         with open(self.voc_path, 'wb') as f:
             data = {
-                'docs_indexed':self.docs_indexed,
-                'count':self.count,
-                'voc':self.voc
+                'docs_indexed': self.docs_indexed,
+                'count': self.count,
+                'voc': self.voc,
+                'dirs': self.directories
             }
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 
     def load_voc(self):
-        with open(self.voc_path, 'rb') as f:
-            data = pickle.load(f)
-            try:
-                self.docs_indexed = data['docs_indexed']
-                self.count = data['count']
-                self.voc = data['voc']
-            except KeyError as e:
-                print("Your index file data version is too low. Loading failed.")
+        try:
+            with open(self.voc_path, 'rb') as f:
+                data = pickle.load(f)
+                try:
+                    self.count = data['count']
+                    self.voc = data['voc'],
+                    self.directories = data['dirs']
+                    self.docs_indexed = data['docs_indexed']
+                except KeyError as e:
+                    print("Your index file data version is too low. Loading failed.")
+                    return
+        except FileNotFoundError as e:
+            print("File not found. Starting with an empty index")
+            return
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
@@ -118,11 +126,16 @@ class Index:
             if folder_name[-1] != '/':
                 folder_name = folder_name + '/'
 
-            files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
+            files = doc_utils.get_indexable_filenames(folder_name)
+            id_offset = 0
+            if len(self.directories) > 0:
+                id_offset = len(doc_utils.get_indexable_filenames(self.directories[-1]['name']))\
+                            + self.directories[-1]['offset']
+            self.directories.append({'name': folder_name, 'offset': id_offset})
 
             timer.round()
             for i in range(0, len(files), batch_size):
-                tfs = self.process_files(files[i:min(i + batch_size, len(files))])
+                tfs = self.process_files(files[i:min(i + batch_size, len(files))], start_value=id_offset+i)
 
                 self.merge_save(tfs)
                 timer.round()
@@ -193,8 +206,8 @@ class Index:
 
         return value
 
-    def process_files(self, files):
-        files_indexed = 0
+    def process_files(self, files, start_value=0):
+        files_indexed = start_value
         # Dictionary of term frequencies per word per doc
 
         tf_per_doc = {}
