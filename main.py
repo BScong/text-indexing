@@ -58,7 +58,9 @@ def main():
         print("3) Show stats about the index")
         print("4) Look for similar documents")
         print("5) Read a document")
-        print("6) Exit")
+        print("6) Search with Fagin's algorithm")
+        print("7) Look for semantically similar words")
+        print("8) Exit")
         print("\n Please enter the number of a menu item")
 
         user_choice = input('> ')
@@ -127,6 +129,18 @@ def main():
             print(reader.read_doc(int(doc_id)))
 
         elif menu_item == 6:
+            k = input('Please enter k: ')
+            search_query = input('Please enter your search query: ')
+            searcher.searchFagins(search_query.split(), int(k))
+
+        elif menu_item == 7:
+            search_query = input('Please enter a word or type :quit to return to menu: : ')
+            if search_query == ":quit":
+                break
+            k = input('Please enter the number of words you want: ')
+            searcher.similarWord(search_query, int(k))
+
+        elif menu_item == 8:
             exit(0)
 
         else:
