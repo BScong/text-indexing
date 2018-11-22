@@ -164,16 +164,15 @@ class Searcher:
                 c[doc] = temp_score
 
         c = OrderedDict(sorted(c.items(), key=lambda t: t[1], reverse=True))
-        output = -1
+        output = []
         timer.stop()
         time_tuple = timer.get_duration_tuple()
         if verbose:
             print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
 
         for document, score in c.items():
-            if output < 0:
-                output = document
-            print('Document: ', document, '---', 'Score: ', score)
+            output.append({'document': document, 'score': score})
+
         return output
 
     def knn(self, doc, k, verbose=True):
@@ -199,12 +198,15 @@ class Searcher:
         time_tuple = timer.get_duration_tuple()
         if verbose:
             print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
+        output = []
 
         for document, score in pl:
-            print('Document: ', document, '---', 'Score: ', score)
+            output.append({'document': document, 'score': score})
             count += 1
             if count == k:
                 break
+
+        return output
 
     def similar_word(self, word, k):
         word = self.prepare_query(word)

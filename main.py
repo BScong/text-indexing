@@ -8,6 +8,24 @@ import text_preprocessing
 from doc_utils import Reader
 
 
+def print_results(results, reader=None):
+    for i in range(len(results)):
+        result = results[i]
+        if reader is not None:
+            print("{:03}. id {:09}\t{}\t--- {}"
+                  .format(i + 1, result['document'],
+                          reader.get_doc_title(result['document']),
+                          result['score']))
+        else:
+            print("no. {:09} --- {}".format(result['document'], result['score']))
+
+def read_ux(default_doc, reader):
+    doc_id = input('Please enter the document id{}: '
+                   .format("" if default_doc < 0 else " ({})".format(default_doc))).strip()
+    if doc_id == "" and default_doc >= 0:
+        doc_id = default_doc
+    print(reader.read_doc(int(doc_id)))
+
 def main():
     parser = argparse.ArgumentParser(description='Text indexing',
                                      epilog='Written for the INSA Lyon text-indexing Project by Anh Pham, Mathilde du '
@@ -74,6 +92,7 @@ def main():
 
         # We know it's only digits, so no exception handling here
         menu_item = int(menu_item.string)
+        default_doc = -1
 
         if menu_item == 1:
             # Get a folder
@@ -84,30 +103,18 @@ def main():
                 folder = default
             index.index_folder(folder, batch_size, args.progress_bar)
         elif menu_item == 2:
-            default = -1
             while True:
                 search_query = input('\nType :read to display a document or :quit to return to menu'
                                      '\nPlease enter your search query: ')
                 if search_query == ":quit":
                     break
                 elif search_query == ":read":
-                    doc_id = input('Please enter the document id{}: '
-                                   .format("" if default < 0 else " ({})".format(default))).strip()
-                    if doc_id == "" and default >= 0:
-                        doc_id = default
-                    print(reader.read_doc(int(doc_id)))
+                    read_ux(default_doc, reader)
                 else:
                     results = searcher.search(search_query)
-                    for result in results:
-                        if args.title:
-                            print("no. {:08}\t{}\t--- {}"
-                                  .format(result['document'],
-                                          reader.get_doc_title(result['document']),
-                                          result['score']))
-                        else:
-                            print("no. {:08} --- {}".format(result['document'], result['score']))
+                    print_results(results, reader if args.title else None)
                     if len(results) >= 1:
-                        default = results[0]['document']
+                        default_doc = results[0]['document']
 
         elif menu_item == 3:
             index.print_index_stats()
@@ -119,23 +126,27 @@ def main():
                 if search_query == ":quit":
                     break
                 elif search_query == ":read":
-                    doc_id = input('Please enter the document id: ')
-                    print(reader.read_doc(int(doc_id)))
+                    read_ux(default_doc, reader)
                 else:
                     k = input('Please enter the number of documents you want: ')
-                    searcher.knn(int(search_query), int(k))
+                    results = searcher.knn(int(search_query), int(k))
+                    print_results(results, reader if args.title else None)
+                    if len(results) >= 1:
+                        default_doc = results[0]['document']
 
         elif menu_item == 5:
-            doc_id = input('Please enter the document id: ')
-            print(reader.read_doc(int(doc_id)))
+            read_ux(default_doc, reader)
 
         elif menu_item == 6:
             k = input('Please enter k: ')
             search_query = input('Please enter your search query: ')
-            searcher.search_fagins(search_query, int(k))
+            results = searcher.search_fagins(search_query, int(k))
+            print_results(results, reader if args.title else None)
+            if len(results) >= 1:
+                default_doc = results[0]['document']
 
         elif menu_item == 7:
-            search_query = input('Please enter a word or type :quit to return to menu: : ')
+            search_query = input('Please enter a word or type :quit to return to menu: ')
             if search_query == ":quit":
                 break
             k = input('Please enter the number of words you want: ')
