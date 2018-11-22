@@ -2,13 +2,12 @@ import io
 from collections import OrderedDict
 import struct
 import os
-from os import listdir
-from os.path import isfile, join
 import math
 import numpy
 import statistics
 import pickle
 from timer import Timer
+import terminal
 import doc_utils
 
 
@@ -60,10 +59,10 @@ class Index:
                     self.docs_indexed = data['docs_indexed']
                     self.index_vectors = data['index_vectors']
                     self.context_vectors = data['context_vectors']
-                except KeyError as e:
+                except KeyError:
                     print("Your index file data version is too low. Loading failed.")
                     return
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             print("File not found. Starting with an empty index")
             return
 
@@ -124,7 +123,7 @@ class Index:
         # see slide 10
         return math.log10(self.docs_indexed / (1 + num_where_appeared))
 
-    def index_folder(self, folder_name, batch_size):
+    def index_folder(self, folder_name, batch_size, progress_bar=False):
         # Open files from specified folder
         timer = Timer()
         timer.start()
@@ -143,16 +142,11 @@ class Index:
 
             timer.round()
             for i in range(0, len(files), batch_size):
-                tfs = self.process_files(files[i:min(i + batch_size, len(files))], start_value=id_offset+i)
+                tfs = self.process_files(files[i:min(i + batch_size, len(files))],
+                                         start_value=id_offset+i, total=len(files) if progress_bar else None)
 
                 self.merge_save(tfs)
                 timer.round()
-
-                """terminal.print_progress(min(i + batch_size, len(files)),
-                                        len(files),
-                                        prefix='Adding files: ',
-                                        suffix='Complete',
-                                        bar_length=80)"""
 
             timer.stop(last_round=False)
             batch_times = timer.get_round_durations()
@@ -214,7 +208,7 @@ class Index:
 
         return value
 
-    def process_files(self, files, start_value=0):
+    def process_files(self, files, start_value=0, total=None):
         files_indexed = start_value
         # Dictionary of term frequencies per word per doc
 
@@ -261,6 +255,12 @@ class Index:
                 self.docs_indexed += 1
 
             files_indexed += 1
+            if total is not None:
+                terminal.print_progress(files_indexed,
+                                        total,
+                                        prefix='Adding files: ',
+                                        suffix='Complete',
+                                        bar_length=80)
         return tf_per_doc
 
     def print_index_stats(self):

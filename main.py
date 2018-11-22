@@ -10,14 +10,18 @@ from doc_utils import Reader
 
 def main():
     parser = argparse.ArgumentParser(description='Text indexing',
-                                     epilog='Written for the INSA Lyon text-indexing Project by Anh Pham, Mathilde du Plessix, '
-                                            'Romain Latron, Beonît Zhong, Martin Haug. 2018 All rights reserved.')
+                                     epilog='Written for the INSA Lyon text-indexing Project by Anh Pham, Mathilde du '
+                                            'Plessix, Romain Latron, Beonît Zhong, '
+                                            'Martin Haug. 2018 All rights reserved.')
 
     parser.add_argument('pl', help='Posting list location')
     parser.add_argument('--eval', default=None, help='Used to eval indexing')
-    parser.add_argument('-b','--batch', type=int, default=10, help='Define the batch size')
-    parser.add_argument('-l','--load', dest='load', action='store_true')
-    parser.add_argument('-t','--title', help='Display document titles in the search results', action='store_true')
+    parser.add_argument('-b', '--batch', type=int, default=10, help='Define the batch size')
+    parser.add_argument('-l', '--load', dest='load', action='store_true')
+    parser.add_argument('-t', '--title', help='Display document titles in the search results', action='store_true')
+    parser.add_argument('-s', '--stopwords', help='Filter stopwords from the index', action='store_true')
+    parser.add_argument('--stem', help='Use stemming', action='store_true')
+    parser.add_argument('--progress-bar', help='Show a progress bar while indexing', action='store_true')
     args = parser.parse_args()
 
     if len(sys.argv) < 2:
@@ -27,29 +31,25 @@ def main():
 
     path = args.pl
     batch_size = args.batch
-    eval = args.eval
-
-
 
     m = re.search('((?<=^["\']).*(?=["\']$))', path)
     if m is not None:
         path = m.group(0)
 
-    line_filters = text_preprocessing.get_instances_of_all_line_preparators()
-    word_filters = text_preprocessing.get_instances_of_all_word_preparators()
+    line_filters = text_preprocessing.get_instances_of_all_line_preparators(stopwords=args.stopwords)
+    word_filters = text_preprocessing.get_instances_of_all_word_preparators(stemming=args.stem)
     # Get a instance of our index and search
     index = Index(path, line_filters, word_filters, args.load)
-    searcher = Searcher(index, line_filters, word_filters)
+    searcher = Searcher(index)
+    reader = Reader(index)
     # Prepare the RegEx to find numbers in our user input
     int_find = re.compile('\d+')
 
-    if eval:
-        index.index_folder(eval, batch_size)
+    if args.eval:
+        index.index_folder(args.eval, batch_size, args.progress_bar)
         return
     print("\nWelcome to the research engine")
     print("==============================")
-    path_current = ""
-    reader = None
     # Return to the menu after tasks were accomplished
     while True:
         print("\nWhat would you like to do?")
@@ -82,9 +82,7 @@ def main():
             folder = input('({}) > '.format(default)).strip()
             if folder == "":
                 folder = default
-            path_current = folder
-            index.index_folder(folder, batch_size)
-            reader = Reader(index)
+            index.index_folder(folder, batch_size, args.progress_bar)
         elif menu_item == 2:
             default = -1
             while True:
@@ -99,10 +97,13 @@ def main():
                         doc_id = default
                     print(reader.read_doc(int(doc_id)))
                 else:
-                    results = searcher.search(search_query.split())
+                    results = searcher.search(search_query)
                     for result in results:
                         if args.title:
-                            print("no. {:08}\t{}\t--- {}".format(result['document'], reader.get_doc_title(result['document']), result['score']))
+                            print("no. {:08}\t{}\t--- {}"
+                                  .format(result['document'],
+                                          reader.get_doc_title(result['document']),
+                                          result['score']))
                         else:
                             print("no. {:08} --- {}".format(result['document'], result['score']))
                     if len(results) >= 1:
@@ -131,14 +132,14 @@ def main():
         elif menu_item == 6:
             k = input('Please enter k: ')
             search_query = input('Please enter your search query: ')
-            searcher.searchFagins(search_query.split(), int(k))
+            searcher.search_fagins(search_query, int(k))
 
         elif menu_item == 7:
             search_query = input('Please enter a word or type :quit to return to menu: : ')
             if search_query == ":quit":
                 break
             k = input('Please enter the number of words you want: ')
-            searcher.similarWord(search_query, int(k))
+            searcher.similar_word(search_query, int(k))
 
         elif menu_item == 8:
             exit(0)

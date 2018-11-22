@@ -5,7 +5,8 @@ from os.path import isfile, join
 
 def get_indexable_filenames(folder_name):
     return sorted([folder_name + f for f in listdir(folder_name)
-                 if isfile(join(folder_name, f)) and 'la' in f])
+                   if isfile(join(folder_name, f)) and 'la' in f])
+
 
 def get_element_inner_text(element, xpath):
     if element is None:
@@ -14,6 +15,7 @@ def get_element_inner_text(element, xpath):
     if found is None:
         return ""
     return "".join(found.itertext())
+
 
 def file_to_xml(file_path):
     with open(file_path, "r") as file:
@@ -26,7 +28,11 @@ def file_to_xml(file_path):
 
 def extract_data(raw_document_path, files_indexed):
     texts = {}
-    docs = file_to_xml(raw_document_path)
+    try:
+        docs = file_to_xml(raw_document_path)
+    except ElTree.ParseError:
+        return texts
+
     articles_indexed = 0
     for article in docs:
         doc_id = int(article.find('./DOCID').text.strip()) + (files_indexed * (10 ** 6))
@@ -45,7 +51,7 @@ def extract_data(raw_document_path, files_indexed):
     return texts
 
 
-def title_of_doc(doc_no, file_path, all=False, max_char=60, pad=False):
+def title_of_doc(doc_no, file_path, complete=False, max_char=60, pad=False):
     tree = file_to_xml(file_path)
     title = str(doc_no)
     for article in tree:
@@ -55,7 +61,7 @@ def title_of_doc(doc_no, file_path, all=False, max_char=60, pad=False):
         break
     newline_array = title.split('\n')
     title = newline_array[0]
-    if all:
+    if complete:
         title = " ".join(newline_array)
     if 3 < max_char < len(title):
         stripped_title = title[:max_char - 3].strip()
@@ -64,6 +70,7 @@ def title_of_doc(doc_no, file_path, all=False, max_char=60, pad=False):
     if pad and max_char > 3 and len(title) < max_char:
         title += ' ' * (max_char - len(title))
     return title
+
 
 class Reader:
     def __init__(self, index):
