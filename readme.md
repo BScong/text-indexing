@@ -52,6 +52,17 @@ This algorithm is slower than the naive approach, it can be explained by several
 - It starts with sorting the PL of each requested words by their score, the more a word appears in a lot of document, themore it's time consuming
 - In the last part, it has to browse for each document in M, all the PL to check if it is also present in other documents. So the more words are distinct the more it takes time.
 
+### Search k nearest neighbours for a document
+
+The request takes an id of document as a parameter, then looks all over the PL for the words that are contained in the document. Then,
+we make the sum of the products of the scores of the matching words of the document for every document in the base, and we display the k documents with highest score.
+It is actually similar to a scalar product, with vectors representing the score of the words in the dictionnary for each document.
+
+### Semanticaly similar words
+
+We implemented an option to search for semantically similar words to a given word. When we process the files, we create a 200 digits vector for each document, with four +1 and four -1 randomly located, and the rest filled with zeros. Each word has a context vector of the same size, 200, initialised at 0. Then, each time a word is contained in a document, we add the document vector to the context vector of the word, and we normalize it.
+This way, when we enter a word as a parameter, the programm makes a scalar product between the context vector of the word and all words of the dictionnary (similar to a cosine function because the vectors are normalized) and returns the k words with highest score.
+
 ## Benchmark
 The following benchmarks have been made on the entire dataset (131896 documents in 730 files).
 We wanted to see the impact of the size of each batch on memory consumption and running time.
