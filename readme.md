@@ -37,8 +37,20 @@ This algorithm relies on several things:
 
 For each batch, we build a posting list in memory. When this PL is built, we merge it to the PL on disk (or we save it if it's the first batch). For the merge process, we iterate on the vocabulary and merge both lines (PL on disk and PL in memory if present). We then update the offset in the vocabulary and move to the next word. At the end, we iterate on the PL on memory to add new words that are not yet present in the vocabulary.
 
-### Stemming
-Stemming is also implemented to regroup words from the same semantic family.
+### Search documents with word
+
+- Naive approach: 
+The research can be done in a disjonctive way (one of the words have to be in the documents) or conjonctive way (all the words have to be in documents).
+To research documents in a conjonctive way, you have to put '&' between the words, without anything it will be a disjonctive search. 
+The result of the search show documents ordered by their score which is the sum of the scores for each words.
+
+- Fagin's algorithm:
+There is no disjonctive or conjonctive search (search can be done with '&' or without it) because if a word doesn't appear in a document, the document will get 0 as a score and will be part of the average score. 
+The result of the search show documents ordered by their score which is the average (suming the scores of each words and dividing it by the number of words).
+
+This algorithm is slower than the naive approach, it can be explained by several factors:
+- It starts with sorting the PL of each requested words by their score, the more a word appears in a lot of document, themore it's time consuming
+- In the last part, it has to browse for each document in M, all the PL to check if it is also present in other documents. So the more words are distinct the more it takes time.
 
 ## Benchmark
 The following benchmarks have been made on the entire dataset (131896 documents in 730 files).
