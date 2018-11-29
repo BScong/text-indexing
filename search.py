@@ -145,23 +145,23 @@ class Searcher:
                     if doc in pl_list[i]:
                         temp_score = ((temp_score * temp_length) + pl_list[i][doc]) / (temp_length + 1)
                         temp_length += 1
-                    # score set to 0 when doc not in pl
+                    # if doc is not in PL
                     else:
-                        temp_score = temp_score * temp_length / (temp_length + 1)
-                        temp_length += 1
+                        break
 
             # check if current doc is in all posting lists and its score is greater than min score in C
-            if c:
-                if temp_score > min(c.values()) and len(c) == k:
-                    min_entry = min(c, key=c.get)
-                    del c[min_entry]
+            if temp_length == len(pl_list):
+                if c:
+                    if temp_score > min(c.values()) and len(c) == k:
+                        min_entry = min(c, key=c.get)
+                        del c[min_entry]
+                        c[doc] = temp_score
+                    # case where C not full yet
+                    elif len(c) < k:
+                        c[doc] = temp_score
+                # if c is empty
+                else:
                     c[doc] = temp_score
-                # case where C not full yet
-                elif len(c) < k:
-                    c[doc] = temp_score
-            # if c is empty
-            else:
-                c[doc] = temp_score
 
         c = OrderedDict(sorted(c.items(), key=lambda t: t[1], reverse=True))
         output = []
