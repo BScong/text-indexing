@@ -53,13 +53,13 @@ The research can be done in a disjunctive way (one of the words have to be in th
 To research documents in a conjunctive way, you have to put '&' between the words, without anything it will be a disjunctive search.
 The result of the search show documents ordered by their score which is the sum of the scores for each word.
 
-- Fagin's algorithm:
-There is no disjunctive or conjunctive search (search can be done with '&' or without it) because if a word doesn't appear in a document, the document will get 0 as a score and will be part of the average score.
-The result of the search show documents ordered by their score which is the average (summing the scores of each word and dividing it by the number of words).
+- Fagin's top k algorithm:
+This algorithm is used for conjunctive search (search can be done with '&' or without it) and returns the top k documents that contain the words in the request.
+The result of the search show documents ordered by their score which is the average (summing the scores of the documents in their respective PL and dividing it by the number of words).
 
 This algorithm is slower than the naive approach, it can be explained by several factors:
 - It starts with sorting the PL of each requested words by their score, the more a word appears in a lot of document, the more it's time-consuming
-- In the last part, it has to browse for each document in M, all the PL to check if it is also present in other documents. So the more words are distinct the more it takes time.
+- In the last part, it has to browse each document that has been added in M, and check whether the document has been seen in all the PL. This process can take some time when the request is made of many words and when each respective word does not appear in every document. As a result, M can contain many documents which presence has to be checked in all the PL.
 
 ### Search k nearest neighbors for a document
 
@@ -89,3 +89,5 @@ We can also see that there is threshold for the batch size, above that threshold
 
 ### Search
 ![Plot of request time depending on length of conjonctive request](https://github.com/BScong/text-indexing/blob/master/benchmark/search_benchmark.png)
+
+In this benchmark we can see that the naive approach performs better than Fagin's algorithm mainly due to the two points that have been mentionned in the explanation of the algorithm. Due to lack of time, we were not able to tackle the problem of the performance of OrderedDict(), which in our measurements took almost half the time of the algorithm. Solving this problem could cut down the request time significantly. Also, optimizing the parallel access to the PL could be another factor that could improve the algorithm's performance.
