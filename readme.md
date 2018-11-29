@@ -1,16 +1,19 @@
 # Text Indexing
 
 ## Goal
-The goal of this project is to index every word from a large set of documents, in order to perform searches on them (simple, conjonctive, disjonctive searches), sorted by relevance.
+The goal of this project is to index every word from a large set of documents, in order to perform searches on them (simple, conjunctive, disjunctive searches), sorted by relevance.
 
 ## Usage
-`python3 main.py [-h] [--eval EVAL] [-b BATCH] [-l] pl_file_path`
+`python3 main.py [-h] [--eval EVAL] [-b BATCH] [-l] [-s] [--stem] [--progress-bar] pl_file_path`
 You have to execute `main.py` by giving it a path for the Posting List file. It overrides it by default.
 
 Options:
  - `-l`,`--load`: load the current Posting List and vocabulary. The vocabulary is stored at path (`pl_file_path+'_voc'`).
  - `--eval`: used to measure batch processing times. Need to specify a folder to index as a parameter.
  - `-b`,`--batch`: to specify a batch size.
+ - `-s`, `--stopwords`: ignore english stopwords while indexing or index with stopwords ignored used
+ - `--stem`: use stemming
+ - `--progress-bar`: show a progress bar while indexing
 
 ## Principle
 
@@ -35,12 +38,40 @@ This algorithm relies on several things:
 -   Only one posting list is valid at a time t
 -   A temporary posting list is kept in memory
 
-For each batch, we build a posting list in memory. When this PL is built, we merge it to the PL on disk (or we save it if it's the first batch). For the merge process, we iterate on the vocabulary and merge both lines (PL on disk and PL in memory if present). We then update the offset in the vocabulary and move to the next word. At the end, we iterate on the PL on memory to add new words that are not yet present in the vocabulary.
+For each batch, we build a posting list in memory. When this PL is built, we merge it to the PL on disk (or we save it if it's the first batch). For the merge process, we iterate on the vocabulary and merge both lines (PL on disk and PL in memory if present). We then update the offset in the vocabulary and move to the next word. In the end, we iterate on the PL on memory to add new words that are not yet present in the vocabulary.
 
 This architecture is not very efficient for distributed computing as we need to merge the files after each batch. The optimal solution for a distributed environment is to generate all the files for each batch on a first phase, then merge them on a second phase.
 
 ### Stemming
+
 Stemming is also implemented to regroup words from the same semantic family.
+
+### Search documents with a word
+
+- Naive approach:
+The research can be done in a disjunctive way (one of the words have to be in the documents) or conjunctive way (all the words have to be in documents).
+To research documents in a conjunctive way, you have to put '&' between the words, without anything it will be a disjunctive search.
+The result of the search show documents ordered by their score which is the sum of the scores for each word.
+
+- Fagin's algorithm:
+There is no disjunctive or conjunctive search (search can be done with '&' or without it) because if a word doesn't appear in a document, the document will get 0 as a score and will be part of the average score.
+The result of the search show documents ordered by their score which is the average (summing the scores of each word and dividing it by the number of words).
+
+This algorithm is slower than the naive approach, it can be explained by several factors:
+- It starts with sorting the PL of each requested words by their score, the more a word appears in a lot of document, the more it's time-consuming
+- In the last part, it has to browse for each document in M, all the PL to check if it is also present in other documents. So the more words are distinct the more it takes time.
+
+### Search k nearest neighbors for a document
+
+The request takes an id of a document as a parameter, then looks all over the PL for the words that are contained in the document. Then,
+we make the sum of the products of the scores of the matching words of the document for every document in the base, and we display the k documents with the highest score.
+It is actually similar to a scalar product, with vectors representing the score of the words in the dictionary for each document.
+
+### Semantically similar words
+
+We implemented an option to search for semantically similar words to a given word. When we process the files, we create a 200 digits vector for each document, with four +1 and four -1 randomly located, and the rest filled with zeros. Each word has a context vector of the same size, 200, initialized at 0. Then, each time a word is contained in a document, we add the document vector to the context vector of the word, and we normalize it.
+This way, when we enter a word as a parameter, the program makes a scalar product between the context vector of the word and all words of the dictionary (similar to a cosine function because the vectors are normalized) and returns the k words with the highest score.
+
 
 ## Benchmark
 The following benchmarks have been made on the entire dataset (131896 documents in 730 files).

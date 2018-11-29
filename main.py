@@ -8,15 +8,38 @@ import text_preprocessing
 from doc_utils import Reader
 
 
+def print_results(results, reader=None):
+    for i in range(len(results)):
+        result = results[i]
+        if reader is not None:
+            print("{:03}. id {:09}\t{}\t--- {}"
+                  .format(i + 1, result['document'],
+                          reader.get_doc_title(result['document']),
+                          result['score']))
+        else:
+            print("no. {:09} --- {}".format(result['document'], result['score']))
+
+def read_ux(default_doc, reader):
+    doc_id = input('Please enter the document id{}: '
+                   .format("" if default_doc < 0 else " ({})".format(default_doc))).strip()
+    if doc_id == "" and default_doc >= 0:
+        doc_id = default_doc
+    print(reader.read_doc(int(doc_id)))
+
 def main():
     parser = argparse.ArgumentParser(description='Text indexing',
-                                     epilog='Written for the INSA Lyon text-indexing Project by Anh Pham, Mathilde du Plessix, '
-                                            'Romain Latron, Beonît Zhong, Martin Haug. 2018 All rights reserved.')
+                                     epilog='Written for the INSA Lyon text-indexing Project by Anh Pham, Mathilde du '
+                                            'Plessix, Romain Latron, Beonît Zhong, '
+                                            'Martin Haug. 2018 All rights reserved.')
 
     parser.add_argument('pl', help='Posting list location')
     parser.add_argument('--eval', default=None, help='Used to eval indexing')
-    parser.add_argument('-b','--batch', type=int, default=10, help='Define the batch size')
-    parser.add_argument('-l','--load', dest='load', action='store_true')
+    parser.add_argument('-b', '--batch', type=int, default=10, help='Define the batch size')
+    parser.add_argument('-l', '--load', dest='load', action='store_true')
+    parser.add_argument('-t', '--title', help='Display document titles in the search results', action='store_true')
+    parser.add_argument('-s', '--stopwords', help='Filter stopwords from the index', action='store_true')
+    parser.add_argument('--stem', help='Use stemming', action='store_true')
+    parser.add_argument('--progress-bar', help='Show a progress bar while indexing', action='store_true')
     args = parser.parse_args()
 
     if len(sys.argv) < 2:
@@ -26,29 +49,25 @@ def main():
 
     path = args.pl
     batch_size = args.batch
-    eval = args.eval
-
-
 
     m = re.search('((?<=^["\']).*(?=["\']$))', path)
     if m is not None:
         path = m.group(0)
 
-    line_filters = text_preprocessing.get_instances_of_all_line_preparators()
-    word_filters = text_preprocessing.get_instances_of_all_word_preparators()
+    line_filters = text_preprocessing.get_instances_of_all_line_preparators(stopwords=args.stopwords)
+    word_filters = text_preprocessing.get_instances_of_all_word_preparators(stemming=args.stem)
     # Get a instance of our index and search
     index = Index(path, line_filters, word_filters, args.load)
-    searcher = Searcher(index, line_filters, word_filters)
+    searcher = Searcher(index)
+    reader = Reader(index)
     # Prepare the RegEx to find numbers in our user input
     int_find = re.compile('\d+')
 
-    if eval:
-        index.index_folder(eval, batch_size)
+    if args.eval:
+        index.index_folder(args.eval, batch_size, args.progress_bar)
         return
     print("\nWelcome to the research engine")
     print("==============================")
-    path_current = ""
-    reader = None
     # Return to the menu after tasks were accomplished
     while True:
         print("\nWhat would you like to do?")
@@ -73,6 +92,7 @@ def main():
 
         # We know it's only digits, so no exception handling here
         menu_item = int(menu_item.string)
+        default_doc = -1
 
         if menu_item == 1:
             # Get a folder
@@ -81,24 +101,20 @@ def main():
             folder = input('({}) > '.format(default)).strip()
             if folder == "":
                 folder = default
-            path_current = folder
-            index.index_folder(folder, batch_size)
-            reader = Reader(path_current)
+            index.index_folder(folder, batch_size, args.progress_bar)
         elif menu_item == 2:
-            default = -1
             while True:
                 search_query = input('\nType :read to display a document or :quit to return to menu'
                                      '\nPlease enter your search query: ')
                 if search_query == ":quit":
                     break
                 elif search_query == ":read":
-                    doc_id = input('Please enter the document id{}: '
-                                   .format("" if default < 0 else " ({})".format(default))).strip()
-                    if doc_id == "" and default >= 0:
-                        doc_id = default
-                    print(reader.read_doc(int(doc_id)))
+                    read_ux(default_doc, reader)
                 else:
-                    default = searcher.search(search_query.split())
+                    results = searcher.search(search_query)
+                    print_results(results, reader if args.title else None)
+                    if len(results) >= 1:
+                        default_doc = results[0]['document']
 
         elif menu_item == 3:
             index.print_index_stats()
@@ -110,27 +126,31 @@ def main():
                 if search_query == ":quit":
                     break
                 elif search_query == ":read":
-                    doc_id = input('Please enter the document id: ')
-                    print(reader.read_doc(int(doc_id)))
+                    read_ux(default_doc, reader)
                 else:
                     k = input('Please enter the number of documents you want: ')
-                    searcher.knn(int(search_query), int(k))
+                    results = searcher.knn(int(search_query), int(k))
+                    print_results(results, reader if args.title else None)
+                    if len(results) >= 1:
+                        default_doc = results[0]['document']
 
         elif menu_item == 5:
-            doc_id = input('Please enter the document id: ')
-            print(reader.read_doc(int(doc_id)))
+            read_ux(default_doc, reader)
 
         elif menu_item == 6:
             k = input('Please enter k: ')
             search_query = input('Please enter your search query: ')
-            searcher.searchFagins(search_query.split(), int(k))
+            results = searcher.search_fagins(search_query, int(k))
+            print_results(results, reader if args.title else None)
+            if len(results) >= 1:
+                default_doc = results[0]['document']
 
         elif menu_item == 7:
-            search_query = input('Please enter a word or type :quit to return to menu: : ')
+            search_query = input('Please enter a word or type :quit to return to menu: ')
             if search_query == ":quit":
                 break
             k = input('Please enter the number of words you want: ')
-            searcher.similarWord(search_query, int(k))
+            searcher.similar_word(search_query, int(k))
 
         elif menu_item == 8:
             exit(0)

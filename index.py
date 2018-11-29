@@ -2,13 +2,12 @@ import io
 from collections import OrderedDict
 import struct
 import os
-from os import listdir
-from os.path import isfile, join
 import math
 import numpy
 import statistics
 import pickle
 from timer import Timer
+import terminal
 import doc_utils
 
 
@@ -27,6 +26,7 @@ class Index:
         self.voc_path = path + '_voc'
         self.line_filters = line_preparation
         self.word_filters = word_preparation
+        self.directories = []
         if load:
             timer = Timer()
             timer.start()
@@ -39,25 +39,32 @@ class Index:
     def save_voc(self):
         with open(self.voc_path, 'wb') as f:
             data = {
-                'docs_indexed':self.docs_indexed,
-                'count':self.count,
-                'voc':self.voc,
-                'index_vectors':self.index_vectors,
-                'context_vectors':self.context_vectors
+                'docs_indexed': self.docs_indexed,
+                'count': self.count,
+                'voc': self.voc,
+                'index_vectors': self.index_vectors,
+                'context_vectors': self.context_vectors,
+                'dirs': self.directories
             }
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 
     def load_voc(self):
-        with open(self.voc_path, 'rb') as f:
-            data = pickle.load(f)
-            try:
-                self.docs_indexed = data['docs_indexed']
-                self.count = data['count']
-                self.voc = data['voc']
-                self.index_vectors = data['index_vectors']
-                self.context_vectors = data['context_vectors']
-            except KeyError as e:
-                print("Your index file data version is too low. Loading failed.")
+        try:
+            with open(self.voc_path, 'rb') as f:
+                data = pickle.load(f)
+                try:
+                    self.count = data['count']
+                    self.voc = data['voc']
+                    self.directories = data['dirs']
+                    self.docs_indexed = data['docs_indexed']
+                    self.index_vectors = data['index_vectors']
+                    self.context_vectors = data['context_vectors']
+                except KeyError:
+                    print("Your index file data version is too low. Loading failed.")
+                    return
+        except FileNotFoundError:
+            print("File not found. Starting with an empty index")
+            return
 
     @staticmethod
     def term_frequency(count_doc_occurrences, max_freq):
@@ -116,7 +123,7 @@ class Index:
         # see slide 10
         return math.log10(self.docs_indexed / (1 + num_where_appeared))
 
-    def index_folder(self, folder_name, batch_size):
+    def index_folder(self, folder_name, batch_size, progress_bar=False):
         # Open files from specified folder
         timer = Timer()
         timer.start()
@@ -126,20 +133,20 @@ class Index:
             if folder_name[-1] != '/':
                 folder_name = folder_name + '/'
 
-            files = [folder_name + f for f in listdir(folder_name) if isfile(join(folder_name, f)) and 'la' in f]
+            files = doc_utils.get_indexable_filenames(folder_name)
+            id_offset = 0
+            if len(self.directories) > 0:
+                id_offset = len(doc_utils.get_indexable_filenames(self.directories[-1]['name']))\
+                            + self.directories[-1]['offset']
+            self.directories.append({'name': folder_name, 'offset': id_offset})
 
             timer.round()
             for i in range(0, len(files), batch_size):
-                tfs = self.process_files(files[i:min(i + batch_size, len(files))])
+                tfs = self.process_files(files[i:min(i + batch_size, len(files))],
+                                         start_value=id_offset+i, total=len(files) if progress_bar else None)
 
                 self.merge_save(tfs)
                 timer.round()
-
-                """terminal.print_progress(min(i + batch_size, len(files)),
-                                        len(files),
-                                        prefix='Adding files: ',
-                                        suffix='Complete',
-                                        bar_length=80)"""
 
             timer.stop(last_round=False)
             batch_times = timer.get_round_durations()
@@ -201,8 +208,8 @@ class Index:
 
         return value
 
-    def process_files(self, files):
-        files_indexed = 0
+    def process_files(self, files, start_value=0, total=None):
+        files_indexed = start_value
         # Dictionary of term frequencies per word per doc
 
         tf_per_doc = {}
@@ -210,10 +217,10 @@ class Index:
             for doc_id, text in doc_utils.extract_data(filename, files_indexed).items():
                 # Create index vectors
                 vect = numpy.zeros(self.vectors_size)
-                for i in range(1, 3):
+                for i in range(1, 4):
                     rand = int(self.vectors_size * numpy.random.random_sample())
                     vect[rand] = 1
-                for i in range(1, 3):
+                for i in range(1, 4):
                     rand = int(self.vectors_size * numpy.random.random_sample())
                     vect[rand] = -1
                 self.index_vectors[doc_id] = vect
@@ -248,6 +255,12 @@ class Index:
                 self.docs_indexed += 1
 
             files_indexed += 1
+            if total is not None:
+                terminal.print_progress(files_indexed,
+                                        total,
+                                        prefix='Adding files: ',
+                                        suffix='Complete',
+                                        bar_length=80)
         return tf_per_doc
 
     def print_index_stats(self):

@@ -3,28 +3,30 @@ from collections import OrderedDict
 
 import numpy
 
+
 class Searcher:
-    def __init__(self, index, line_filters, word_filters):
+    def __init__(self, index):
         self.index = index
-        self.word_filters = word_filters
-        self.line_filters = line_filters
 
     def prepare_query(self, query):
-        for line_filter in self.line_filters:
+        for line_filter in self.index.line_filters:
             query = line_filter.prepare_line(query)
 
-        separated_words = query.split(" ")
+        separated_parts = query.split("&")
+        for i in range(len(separated_parts)):
+            separated_parts[i] = separated_parts[i].split(" ")
+            for j in range(len(separated_parts[i])):
+                for line_filter in self.index.word_filters:
+                    separated_parts[i][j] = line_filter.prepare_word(separated_parts[i][j])
+            separated_parts[i] = " ".join(separated_parts[i])
 
-        for i in range(len(separated_words)):
-            for line_filter in self.word_filters:
-                separated_words[i] = line_filter.prepare_word(separated_words[i])
-
-        return " ".join(separated_words)
+        return "&".join(separated_parts)
 
     def search(self, word_list, verbose=True):
         timer = Timer()
         timer.start()
         pl = {}
+        word_list = self.prepare_query(word_list).split()
         for a_word in word_list:
             if a_word.find('&') > -1:
                 conjunctive_part = a_word.split('&')
@@ -61,21 +63,20 @@ class Searcher:
         if not bool(pl):
             print("No document found")
         pl = sorted(pl.items(), key=lambda kv: kv[1], reverse=True)
-        output = -1
+        output = []
         timer.stop()
         time_tuple = timer.get_duration_tuple()
         if verbose:
             print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
 
         for document, score in pl:
-            if output < 0:
-                output = document
-            print('Document: ', document, '---', 'Score: ', score)
+            output.append({'document': document, 'score': score})
         return output
 
-    def searchFagins(self, word_list, k, verbose=True):
+    def search_fagins(self, word_list, k, verbose=True):
         timer = Timer()
         timer.start()
+        word_list = self.prepare_query(word_list).split()
         print(word_list)
         pl_list = {}
         line = 0
@@ -101,7 +102,7 @@ class Searcher:
                         print(conjunctive_part[j] + " : Word not found")
                         print("No documents found")
                         return
-            #disjunctive query
+            # disjunctive query
             else:
                 if a_word in self.index.voc:
                     pl_list[i] = OrderedDict(
@@ -114,12 +115,11 @@ class Searcher:
                 else:
                     print(a_word + " : Word not found")
 
-
-        #stops when C has k elements or we finished going through all the lines of pl
+        # stops when C has k elements or we finished going through all the lines of pl
         while line < min_length and len(c) < k:
             i = 0
             while i < len(pl_list):
-                #iterate on each line of each pl
+                # iterate on each line of each pl
                 if line < len(pl_list[i]):
                     doc_id = list(pl_list[i])[line]
                     if doc_id in m.keys():
@@ -130,7 +130,7 @@ class Searcher:
                             c[doc_id] = m[doc_id][0]
                             del m[doc_id]
                     else:
-                        # Dans M: doc_id -> (score, liste des pl)
+                        # In M: doc_id -> (score, list of pl)
                         pl_visited = list()
                         pl_visited.append(i)
                         m[doc_id] = (pl_list[i][doc_id], pl_visited)
@@ -145,7 +145,7 @@ class Searcher:
                     if doc in pl_list[i]:
                         temp_score = ((temp_score * temp_length) + pl_list[i][doc]) / (temp_length + 1)
                         temp_length += 1
-                    #score set to 0 when doc not in pl
+                    # score set to 0 when doc not in pl
                     else:
                         temp_score = temp_score * temp_length / (temp_length + 1)
                         temp_length += 1
@@ -156,26 +156,24 @@ class Searcher:
                     min_entry = min(c, key=c.get)
                     del c[min_entry]
                     c[doc] = temp_score
-                #case where C not full yet
+                # case where C not full yet
                 elif len(c) < k:
                     c[doc] = temp_score
-            #if c is empty
+            # if c is empty
             else:
                 c[doc] = temp_score
 
         c = OrderedDict(sorted(c.items(), key=lambda t: t[1], reverse=True))
-        output = -1
+        output = []
         timer.stop()
         time_tuple = timer.get_duration_tuple()
         if verbose:
             print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
 
         for document, score in c.items():
-            if output < 0:
-                output = document
-            print('Document: ', document, '---', 'Score: ', score)
-        return output
+            output.append({'document': document, 'score': score})
 
+        return output
 
     def knn(self, doc, k, verbose=True):
         # take the words out of the document
@@ -200,14 +198,18 @@ class Searcher:
         time_tuple = timer.get_duration_tuple()
         if verbose:
             print("Query returned in {}s {}ms".format(time_tuple[1], time_tuple[2]))
+        output = []
 
         for document, score in pl:
-            print('Document: ', document, '---', 'Score: ', score)
+            output.append({'document': document, 'score': score})
             count += 1
             if count == k:
                 break
 
-    def similarWord(self, word, k):
+        return output
+
+    def similar_word(self, word, k):
+        word = self.prepare_query(word)
         if word not in self.index.voc:
             print("Word not found")
             return
@@ -223,6 +225,3 @@ class Searcher:
             count += 1
             if count == k:
                 break
-
-
-
