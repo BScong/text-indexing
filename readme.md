@@ -37,14 +37,24 @@ This algorithm relies on several things:
 
 For each batch, we build a posting list in memory. When this PL is built, we merge it to the PL on disk (or we save it if it's the first batch). For the merge process, we iterate on the vocabulary and merge both lines (PL on disk and PL in memory if present). We then update the offset in the vocabulary and move to the next word. At the end, we iterate on the PL on memory to add new words that are not yet present in the vocabulary.
 
+This architecture is not very efficient for distributed computing as we need to merge the files after each batch. The optimal solution for a distributed environment is to generate all the files for each batch on a first phase, then merge them on a second phase.
+
 ### Stemming
 Stemming is also implemented to regroup words from the same semantic family.
 
 ## Benchmark
 The following benchmarks have been made on the entire dataset (131896 documents in 730 files).
+
+### Indexing
 We wanted to see the impact of the size of each batch on memory consumption and running time.
 
 ![Plot of running time depending on batch size](https://github.com/BScong/text-indexing/blob/master/benchmark/measures_1_clean/time.png)
 
 
 ![Plot of maximum memory consumption depending on batch size](https://github.com/BScong/text-indexing/blob/master/benchmark/measures_1_clean/memory.png)
+
+Here, we can see that we have an inflexion point at around 200/300 for the batch size, that would be an optimal batch size (assuming we have enough memory), as all the batch sizes above that number take approximately the same time to index.
+We can also see that there is threshold for the batch size, above that threshold the memory consumption caps but the process doesn't take longer to run. That may be due to a memory limit set for programs on the OS used to run the benchmark. Also, the computer used for the benchmark had SSDs as hard drives, we suppose that this may be the reason to why the running time was not increased that much.
+
+### Search
+![Plot of request time depending on length of conjonctive request](https://github.com/BScong/text-indexing/blob/master/benchmark/search_benchmark.png)
